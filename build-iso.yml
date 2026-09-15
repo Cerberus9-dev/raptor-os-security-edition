@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/cache
-          key: raptor-security-lb-v7-${{ runner.os }}-${{ hashFiles('build/config/package-lists/*.list.chroot', 'build/config/hooks/*', 'auto/config') }}
+          key: raptor-security-lb-v8-${{ runner.os }}-${{ hashFiles('build/config/package-lists/*.list.chroot', 'build/config/hooks/*', 'auto/config', 'build/config/includes.chroot/**') }}
 
       - name: Free Disk Space
         run: |
@@ -66,18 +66,18 @@ jobs:
           sudo apt-get install -y \
             live-build \
             debootstrap \
-          debian-archive-keyring \
-          squashfs-tools \
-          xorriso \
-          isolinux \
-          syslinux \
-          syslinux-common \
-          syslinux-utils \
-          grub-efi-amd64-bin \
-          mtools \
-          dosfstools \
-          librsvg2-bin \
-          rsync
+            debian-archive-keyring \
+            squashfs-tools \
+            xorriso \
+            isolinux \
+            syslinux \
+            syslinux-common \
+            syslinux-utils \
+            grub-efi-amd64-bin \
+            mtools \
+            dosfstools \
+            librsvg2-bin \
+            rsync
 
       - name: Show Build Tool Versions
         run: |

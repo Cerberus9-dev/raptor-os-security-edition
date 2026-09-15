@@ -1,25 +1,9 @@
 #!/bin/sh
 # 0300-raptor-thirdparty-tools.hook.chroot
 #
-# Installs the four pentest tools deliberately left OUT of
-# raptor-pentest.list.chroot because they're not in Debian's apt repos
-# (see that file's trailing comment for the research behind that call).
-#
-# DELIBERATELY NOT run with `set -e`: these are four independent,
-# best-effort installs of tools from four different upstream sources.
-# One failing (a URL changing, a gem server hiccup) should not abort the
-# entire live-build — it should install the other three and report
-# clearly what didn't make it into the image, so a maintainer checking
-# build logs sees exactly what's missing rather than a total build
-# failure that obscures which of the four was the actual problem.
-#
-# NONE of the four installs below have been executed or tested — this
-# sandbox has no route to portswigger.net, rapid7's installer, rubygems,
-# or PyPI's netexec package (network allowlist only covers a small set
-# of domains — see the environment's network_configuration). Written
-# from each tool's own documented install method, not verified against
-# a real run. Treat first build's log output for this hook as the actual
-# test, not this comment.
+# Installs pentest tools not available in Debian bookworm's default repos.
+# Each tool is installed independently; one failure doesn't abort the build.
+# Check /var/log/raptor-thirdparty-install.log after boot to see what succeeded.
 
 echo "[raptor-security] installing third-party pentest tools (best-effort)"
 
@@ -30,13 +14,88 @@ log() {
     echo "[raptor-thirdparty] $1" | tee -a "$INSTALL_LOG"
 }
 
-# --- Burp Suite Community Edition -----------------------------------
-# PortSwigger's documented headless-install pattern: the "latest" download
-# URL without a pinned version, run with their installer's silent flags.
-# Not pinning a specific version deliberately — PortSwigger doesn't
-# publish stable versioned URLs for Community edition the way a
-# apt/pip package would; pin this to a specific version query param
-# once you've confirmed one against their actual current release.
+# --- masscan (fast port scanner) --------------------------------------
+# Not in Debian bookworm; build from source
+log "installing masscan"
+if apt-get install -y --no-install-recommends git make gcc >>"$INSTALL_LOG" 2>&1; then
+    if git clone --depth 1 https://github.com/robertdavidgraham/masscan.git /opt/masscan >>"$INSTALL_LOG" 2>&1; then
+        if make -C /opt/masscan -j"$(nproc)" >>"$INSTALL_LOG" 2>&1; then
+            cp /opt/masscan/bin/masscan /usr/local/bin/masscan
+            log "masscan installed to /usr/local/bin"
+        else
+            log "WARNING: masscan build failed"
+        fi
+    else
+        log "WARNING: masscan git clone failed"
+    fi
+else
+    log "WARNING: could not install masscan build dependencies"
+fi
+
+# --- recon-ng (reconnaissance framework) ------------------------------
+# Not in Debian bookworm; install via pip
+log "installing recon-ng"
+if apt-get install -y --no-install-recommends python3-pip python3-venv git >>"$INSTALL_LOG" 2>&1; then
+    if git clone --depth 1 https://github.com/lanmaster53/recon-ng.git /opt/recon-ng >>"$INSTALL_LOG" 2>&1; then
+        python3 -m venv /opt/recon-ng/.venv >>"$INSTALL_LOG" 2>&1
+        if /opt/recon-ng/.venv/bin/pip install -r /opt/recon-ng/REQUIREMENTS >>"$INSTALL_LOG" 2>&1; then
+            cat > /usr/local/bin/recon-ng <<'RECONOF'
+#!/bin/sh
+exec /opt/recon-ng/.venv/bin/python /opt/recon-ng/recon-ng "$@"
+RECONOF
+            chmod 755 /usr/local/bin/recon-ng
+            log "recon-ng installed to /opt/recon-ng (launcher: recon-ng)"
+        else
+            log "WARNING: recon-ng pip install failed"
+        fi
+    else
+        log "WARNING: recon-ng git clone failed"
+    fi
+else
+    log "WARNING: could not install recon-ng dependencies"
+fi
+
+# --- ffuf (fast web fuzzer) -------------------------------------------
+# Not in Debian bookworm; install Go binary
+log "installing ffuf"
+if apt-get install -y --no-install-recommends golang-go >>"$INSTALL_LOG" 2>&1; then
+    export GOPATH=/opt/go
+    export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+    if go install github.com/ffuf/ffuf/v2@latest >>"$INSTALL_LOG" 2>&1; then
+        cp /opt/go/bin/ffuf /usr/local/bin/ffuf
+        log "ffuf installed to /usr/local/bin"
+    else
+        log "WARNING: ffuf go install failed"
+    fi
+else
+    log "WARNING: could not install golang for ffuf"
+fi
+
+# --- wifite (wireless auditing) ---------------------------------------
+# Not in Debian bookworm; install via pip
+log "installing wifite"
+if apt-get install -y --no-install-recommends python3-pip python3-venv git >>"$INSTALL_LOG" 2>&1; then
+    if git clone --depth 1 https://github.com/derv82/wifite2.git /opt/wifite >>"$INSTALL_LOG" 2>&1; then
+        python3 -m venv /opt/wifite/.venv >>"$INSTALL_LOG" 2>&1
+        if /opt/wifite/.venv/bin/pip install -r /opt/wifite/requirements.txt >>"$INSTALL_LOG" 2>&1; then
+            cat > /usr/local/bin/wifite <<'WIFIOF'
+#!/bin/sh
+exec /opt/wifite/.venv/bin/python /opt/wifite/wifite.py "$@"
+WIFIOF
+            chmod 755 /usr/local/bin/wifite
+            log "wifite installed to /opt/wifite (launcher: wifite)"
+        else
+            log "WARNING: wifite pip install failed"
+        fi
+    else
+        log "WARNING: wifite git clone failed"
+    fi
+else
+    log "WARNING: could not install wifite dependencies"
+fi
+
+# --- Burp Suite Community Edition -------------------------------------
+# PortSwigger's documented headless-install pattern
 log "installing Burp Suite Community Edition"
 if curl -fsSL "https://portswigger.net/burp/releases/download?product=community&type=Linux" \
         -o /tmp/burpsuite_installer.sh; then
@@ -52,8 +111,8 @@ else
     log "WARNING: could not download Burp Suite installer — not installed"
 fi
 
-# --- Metasploit Framework --------------------------------------------
-# rapid7's own documented one-line installer (msfinstall script).
+# --- Metasploit Framework ---------------------------------------------
+# rapid7's own documented one-line installer (msfinstall script)
 log "installing Metasploit Framework"
 if curl -fsSL \
      https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb \
@@ -82,13 +141,9 @@ else
     log "WARNING: could not install WPScan's Ruby build dependencies"
 fi
 
-# --- NetExec (crackmapexec's maintained fork) ------------------------
+# --- NetExec (crackmapexec's maintained fork) -------------------------
 log "installing NetExec (crackmapexec replacement)"
 if apt-get install -y --no-install-recommends pipx >>"$INSTALL_LOG" 2>&1; then
-    # pipx install as root during chroot build puts it in a location that
-    # needs to end up on every user's PATH, not just root's — pipx's
-    # default behavior installs to root's home, which is wrong for a
-    # live image. Install into a shared location explicitly instead.
     export PIPX_HOME=/opt/pipx
     export PIPX_BIN_DIR=/usr/local/bin
     if pipx install netexec >>"$INSTALL_LOG" 2>&1; then
@@ -100,7 +155,7 @@ else
     log "WARNING: could not install pipx — NetExec not installed"
 fi
 
-# --- radare2 (via bookworm-backports, transiently enabled) -----------
+# --- radare2 (via bookworm-backports, transiently enabled) ------------
 log "installing radare2 (from bookworm-backports)"
 echo "deb http://deb.debian.org/debian bookworm-backports main contrib non-free non-free-firmware" \
     > /etc/apt/sources.list.d/bookworm-backports-transient.list
@@ -110,15 +165,11 @@ if apt-get update >>"$INSTALL_LOG" 2>&1 && \
 else
     log "WARNING: radare2 install from bookworm-backports failed"
 fi
-# Remove the backports source afterward — this system should default to
-# plain bookworm for everything else; leaving backports enabled
-# system-wide risks other packages silently resolving to newer,
-# less-tested backport versions on a later `apt upgrade`.
+# Remove the backports source afterward
 rm -f /etc/apt/sources.list.d/bookworm-backports-transient.list
 apt-get update >>"$INSTALL_LOG" 2>&1 || true
 
-# --- theHarvester (Kali packages it themselves; Debian has no package,
-#     upstream installs via a Python venv) -----------------------------
+# --- theHarvester (OSINT tool) ----------------------------------------
 log "installing theHarvester"
 if apt-get install -y --no-install-recommends python3-venv git >>"$INSTALL_LOG" 2>&1; then
     if git clone --depth 1 https://github.com/laramies/theHarvester.git /opt/theHarvester >>"$INSTALL_LOG" 2>&1; then
@@ -140,8 +191,7 @@ else
     log "WARNING: could not install python3-venv/git — theHarvester not installed"
 fi
 
-# --- bulk_extractor (Kali packages it themselves; Debian has no package,
-#     upstream requires building from source) --------------------------
+# --- bulk_extractor ---------------------------------------------------
 log "installing bulk_extractor"
 log "NOTE: this is a C++ source build with real complexity (its own"
 log "  README documents a nontrivial dependency list and a submodule-based"

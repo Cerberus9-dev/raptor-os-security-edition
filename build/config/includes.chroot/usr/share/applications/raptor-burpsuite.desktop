@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=ffuf
-Comment=Fast web fuzzer written in Go
-Exec=ffuf
+Name=Burp Suite Community
+Comment=Web vulnerability scanner
+Exec=burpsuite
 Icon=utilities-terminal
-Terminal=true
+Terminal=false
 Categories=System;Security;X-Raptor-Web;

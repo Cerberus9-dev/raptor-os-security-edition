@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Masscan Port Scanner
-Comment=Fastest Internet port scanner
-Exec=masscan
+Name=theHarvester
+Comment=OSINT information gathering
+Exec=theHarvester
 Icon=utilities-terminal
 Terminal=true
 Categories=System;Security;X-Raptor-Recon;

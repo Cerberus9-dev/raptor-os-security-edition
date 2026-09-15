@@ -50,6 +50,24 @@ if [ ! -f "$POLKIT_RULE" ]; then
   ERRORS=$((ERRORS + 1))
 fi
 
+# Check for desktop database hook
+if [ ! -f "build/config/hooks/0220-raptor-desktop-database.hook.chroot" ]; then
+  echo "  [ERROR] Missing desktop database hook: build/config/hooks/0220-raptor-desktop-database.hook.chroot"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# Check for whiskermenu config
+if [ ! -f "build/config/includes.chroot/etc/xdg/xfce4/panel/whiskermenu-1.rc" ]; then
+  echo "  [ERROR] Missing whiskermenu config: build/config/includes.chroot/etc/xdg/xfce4/panel/whiskermenu-1.rc"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# Check for raptor-security icon
+if [ ! -f "build/config/includes.chroot/usr/share/icons/hicolor/48x48/apps/raptor-security.svg" ]; then
+  echo "  [ERROR] Missing raptor-security icon: build/config/includes.chroot/usr/share/icons/hicolor/48x48/apps/raptor-security.svg"
+  ERRORS=$((ERRORS + 1))
+fi
+
 echo "==> [4/4] Checking Package List Isolation..."
 EXTRA_LISTS=$(find build/config/package-lists/ -type f ! -name 'raptor-security.list.chroot' | wc -l)
 if [ "$EXTRA_LISTS" -gt 0 ]; then

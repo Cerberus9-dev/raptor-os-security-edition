@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=ffuf
-Comment=Fast web fuzzer written in Go
-Exec=ffuf
+Name=WPScan
+Comment=WordPress security scanner
+Exec=wpscan
 Icon=utilities-terminal
 Terminal=true
 Categories=System;Security;X-Raptor-Web;

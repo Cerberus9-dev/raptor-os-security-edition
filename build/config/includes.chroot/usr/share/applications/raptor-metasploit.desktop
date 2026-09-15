@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Masscan Port Scanner
-Comment=Fastest Internet port scanner
-Exec=masscan
+Name=Metasploit Framework
+Comment=Penetration testing framework
+Exec=msfconsole
 Icon=utilities-terminal
 Terminal=true
 Categories=System;Security;X-Raptor-Recon;

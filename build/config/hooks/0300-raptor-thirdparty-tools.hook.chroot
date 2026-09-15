@@ -97,7 +97,7 @@ fi
 # --- Burp Suite Community Edition -------------------------------------
 # PortSwigger's documented headless-install pattern
 log "installing Burp Suite Community Edition"
-if curl -fsSL "https://portswigger.net/burp/releases/download?product=community&type=Linux" \
+if curl -fsSL --connect-timeout 30 --max-time 300 "https://portswigger.net/burp/releases/download?product=community&type=Linux" \
         -o /tmp/burpsuite_installer.sh; then
     chmod +x /tmp/burpsuite_installer.sh
     if /tmp/burpsuite_installer.sh -q -dir /opt/BurpSuiteCommunity; then
@@ -114,7 +114,7 @@ fi
 # --- Metasploit Framework ---------------------------------------------
 # rapid7's own documented one-line installer (msfinstall script)
 log "installing Metasploit Framework"
-if curl -fsSL \
+if curl -fsSL --connect-timeout 30 --max-time 300 \
      https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb \
      -o /tmp/msfinstall; then
     chmod +x /tmp/msfinstall
@@ -142,17 +142,22 @@ else
 fi
 
 # --- NetExec (crackmapexec's maintained fork) -------------------------
+# Use pip directly instead of pipx (pipx not in bookworm main)
 log "installing NetExec (crackmapexec replacement)"
-if apt-get install -y --no-install-recommends pipx >>"$INSTALL_LOG" 2>&1; then
-    export PIPX_HOME=/opt/pipx
-    export PIPX_BIN_DIR=/usr/local/bin
-    if pipx install netexec >>"$INSTALL_LOG" 2>&1; then
-        log "NetExec installed to /usr/local/bin via pipx"
+if apt-get install -y --no-install-recommends python3-pip python3-venv >>"$INSTALL_LOG" 2>&1; then
+    python3 -m venv /opt/netexec/.venv >>"$INSTALL_LOG" 2>&1
+    if /opt/netexec/.venv/bin/pip install netexec >>"$INSTALL_LOG" 2>&1; then
+        cat > /usr/local/bin/netexec <<'NETOF'
+#!/bin/sh
+exec /opt/netexec/.venv/bin/python -m netexec "$@"
+NETOF
+        chmod 755 /usr/local/bin/netexec
+        log "NetExec installed to /opt/netexec (launcher: netexec)"
     else
-        log "WARNING: pipx install netexec failed"
+        log "WARNING: netexec pip install failed"
     fi
 else
-    log "WARNING: could not install pipx — NetExec not installed"
+    log "WARNING: could not install python3-pip/venv for NetExec"
 fi
 
 # --- radare2 (via bookworm-backports, transiently enabled) ------------

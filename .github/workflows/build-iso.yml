@@ -353,12 +353,12 @@ jobs:
             printf '%s\n' 'search --no-floppy --set=root --label RAPTOR-SECURITY'
             printf '\n'
             printf '%s\n' 'menuentry "Raptor Security (Live)" {'
-            printf '%s\n' '    linux /live/vmlinuz boot=live config components quiet ignore_uuid live-media-timeout=30'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet ignore_uuid live-media-timeout=30'
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
             printf '\n'
             printf '%s\n' 'menuentry "Raptor Security (Live, fail-safe)" {'
-            printf '%s\n' '    linux /live/vmlinuz boot=live config components quiet ignore_uuid live-media-timeout=30 noapic noapm nodma nomce nolapic nosmp'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet ignore_uuid live-media-timeout=30 noapic noapm nodma nomce nolapic nosmp'
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
           } > efi-build/grub.cfg

@@ -4,5 +4,4 @@ Name=Raptor Boot Report
 Comment=One-shot: snapshot of the live desktop state to raptor-boot-report.txt (self-removes)
 Exec=/usr/lib/raptor-security/raptor-boot-report.sh
 Terminal=false
-X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=5
+OnlyShowIn=XFCE;

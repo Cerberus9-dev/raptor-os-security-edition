@@ -6,5 +6,4 @@ Exec=raptor-security-center
 Icon=security-high
 Terminal=false
 Categories=System;Security;
-X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=3
+OnlyShowIn=XFCE;

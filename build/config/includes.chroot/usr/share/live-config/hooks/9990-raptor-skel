@@ -1,0 +1,30 @@
+#!/bin/sh
+# live-config hook: ensure Raptor skel config is applied to live user
+# Runs after live-config creates the user
+
+set -e
+
+LIVE_USER="user"
+LIVE_HOME="/home/${LIVE_USER}"
+
+# Wait for user to exist
+for i in $(seq 1 30); do
+    if id "${LIVE_USER}" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+if ! id "${LIVE_USER}" >/dev/null 2>&1; then
+    echo "[raptor-skel] WARNING: live user ${LIVE_USER} not found after 30s"
+    exit 0
+fi
+
+# Copy skel to user home if our config files don't exist
+if [ ! -f "${LIVE_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" ]; then
+    cp -rT /etc/skel/ "${LIVE_HOME}/"
+    chown -R "${LIVE_USER}:${LIVE_USER}" "${LIVE_HOME}/"
+    echo "[raptor-skel] Copied /etc/skel to ${LIVE_HOME}"
+fi
+
+exit 0

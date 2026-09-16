@@ -1,12 +1,15 @@
 [Unit]
 Description=Copy /etc/skel to live user home (fallback for live-config)
 Before=lightdm.service
+After=local-fs.target live-config.service
 ConditionPathExists=/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
 
 [Service]
 Type=oneshot
 ExecStart=/bin/sh -c 'cp -rT /etc/skel/ /home/user/ && chown -R user:user /home/user'
 RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

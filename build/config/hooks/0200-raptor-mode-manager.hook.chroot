@@ -23,7 +23,8 @@ for unit in \
   raptor-network-protection-manager.service \
   raptor-persistence-manager.service \
   raptor-emergency-shutdown.service \
-  raptor-firstboot.service
+  raptor-firstboot.service \
+  raptor-copy-skel.service
 do
   systemctl enable "$unit" 2>/dev/null || true
 done

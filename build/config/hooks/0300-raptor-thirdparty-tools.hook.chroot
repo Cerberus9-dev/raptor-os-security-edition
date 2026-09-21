@@ -14,6 +14,19 @@ log() {
     echo "[raptor-thirdparty] $1" | tee -a "$INSTALL_LOG"
 }
 
+# --- shared Python build dependencies ----------------------------------
+# Most pip installs that failed on bookworm did so because the chroot lacked
+# the toolchain to build C extensions (cryptography, uvloop, psutil, ...).
+# Install once and reuse for every pip-based tool below.
+log "installing shared Python build dependencies"
+if apt-get install -y --no-install-recommends \
+        build-essential python3-dev pkg-config libssl-dev libffi-dev \
+        >>"$INSTALL_LOG" 2>&1; then
+    log "shared build dependencies installed"
+else
+    log "WARNING: could not install shared build dependencies"
+fi
+
 # --- masscan (fast port scanner) --------------------------------------
 # Not in Debian bookworm; build from source
 log "installing masscan"
@@ -72,20 +85,24 @@ else
 fi
 
 # --- wifite (wireless auditing) ---------------------------------------
-# Not in Debian bookworm; install via pip
+# wifite2 has setup.py but NO requirements.txt — the old `pip install -r
+# requirements.txt` always died with a file-not-found error. Install the
+# project itself instead.
 log "installing wifite"
 if apt-get install -y --no-install-recommends python3-pip python3-venv git >>"$INSTALL_LOG" 2>&1; then
     if git clone --depth 1 https://github.com/derv82/wifite2.git /opt/wifite >>"$INSTALL_LOG" 2>&1; then
         python3 -m venv /opt/wifite/.venv >>"$INSTALL_LOG" 2>&1
-        if /opt/wifite/.venv/bin/pip install -r /opt/wifite/requirements.txt >>"$INSTALL_LOG" 2>&1; then
+        /opt/wifite/.venv/bin/pip install --quiet --upgrade pip setuptools wheel >>"$INSTALL_LOG" 2>&1
+        if /opt/wifite/.venv/bin/pip install --no-cache-dir /opt/wifite >>"$INSTALL_LOG" 2>&1; then
             cat > /usr/local/bin/wifite <<'WIFIOF'
 #!/bin/sh
-exec /opt/wifite/.venv/bin/python /opt/wifite/wifite.py "$@"
+exec /opt/wifite/.venv/bin/python /opt/wifite/wifite "$@"
 WIFIOF
             chmod 755 /usr/local/bin/wifite
             log "wifite installed to /opt/wifite (launcher: wifite)"
         else
-            log "WARNING: wifite pip install failed"
+            log "WARNING: wifite pip install failed (one line is all you get; full log: $INSTALL_LOG)"
+            sed -n '$p' "$INSTALL_LOG"
         fi
     else
         log "WARNING: wifite git clone failed"
@@ -146,7 +163,8 @@ fi
 log "installing NetExec (crackmapexec replacement)"
 if apt-get install -y --no-install-recommends python3-pip python3-venv >>"$INSTALL_LOG" 2>&1; then
     python3 -m venv /opt/netexec/.venv >>"$INSTALL_LOG" 2>&1
-    if /opt/netexec/.venv/bin/pip install netexec >>"$INSTALL_LOG" 2>&1; then
+    /opt/netexec/.venv/bin/pip install --quiet --upgrade pip setuptools wheel >>"$INSTALL_LOG" 2>&1
+    if /opt/netexec/.venv/bin/pip install --no-cache-dir netexec >>"$INSTALL_LOG" 2>&1; then
         cat > /usr/local/bin/netexec <<'NETOF'
 #!/bin/sh
 exec /opt/netexec/.venv/bin/python -m netexec "$@"
@@ -154,32 +172,56 @@ NETOF
         chmod 755 /usr/local/bin/netexec
         log "NetExec installed to /opt/netexec (launcher: netexec)"
     else
-        log "WARNING: netexec pip install failed"
+        log "WARNING: netexec pip install failed (last line:)"
+        sed -n '$p' "$INSTALL_LOG"
     fi
 else
     log "WARNING: could not install python3-pip/venv for NetExec"
 fi
 
-# --- radare2 (via bookworm-backports, transiently enabled) ------------
-log "installing radare2 (from bookworm-backports)"
+# --- radare2 (backports first, then source build as fallback) ---------
+# radare2 is not actually in bookworm-backports, so the apt attempt always
+# failed. Fall back to the project's own supported build from source.
+log "installing radare2 (from bookworm-backports, transiently enabled)"
 echo "deb http://deb.debian.org/debian bookworm-backports main contrib non-free non-free-firmware" \
     > /etc/apt/sources.list.d/bookworm-backports-transient.list
 if apt-get update >>"$INSTALL_LOG" 2>&1 && \
    apt-get install -y --no-install-recommends -t bookworm-backports radare2 >>"$INSTALL_LOG" 2>&1; then
     log "radare2 installed from bookworm-backports"
 else
-    log "WARNING: radare2 install from bookworm-backports failed"
+    log "WARNING: radare2 not in bookworm-backports — falling back to source build"
+    rm -f /etc/apt/sources.list.d/bookworm-backports-transient.list
+    apt-get update >>"$INSTALL_LOG" 2>&1 || true
+    if apt-get install -y --no-install-recommends \
+            build-essential git meson ninja-build pkg-config \
+            >>"$INSTALL_LOG" 2>&1 &&
+       git clone --depth 1 --branch v5.9.2 \
+            https://github.com/radareorg/radare2.git /opt/radare2 \
+            >>"$INSTALL_LOG" 2>&1; then
+        if make -C /opt/radare2 -j"$(nproc)" >>"$INSTALL_LOG" 2>&1 && \
+           make -C /opt/radare2 install >>"$INSTALL_LOG" 2>&1; then
+            ln -sf /usr/local/bin/radare2 /usr/local/bin/r2
+            log "radare2 installed from source (launcher: radare2 / r2)"
+        else
+            log "WARNING: radare2 source build failed"
+        fi
+    else
+        log "WARNING: radare2 source build dependencies/clone failed"
+    fi
 fi
-# Remove the backports source afterward
+# Remove the backports source afterward if it is still present
 rm -f /etc/apt/sources.list.d/bookworm-backports-transient.list
 apt-get update >>"$INSTALL_LOG" 2>&1 || true
 
 # --- theHarvester (OSINT tool) ----------------------------------------
 log "installing theHarvester"
-if apt-get install -y --no-install-recommends python3-venv git >>"$INSTALL_LOG" 2>&1; then
+if apt-get install -y --no-install-recommends python3-pip python3-venv git >>"$INSTALL_LOG" 2>&1; then
     if git clone --depth 1 https://github.com/laramies/theHarvester.git /opt/theHarvester >>"$INSTALL_LOG" 2>&1; then
         python3 -m venv /opt/theHarvester/.venv >>"$INSTALL_LOG" 2>&1
-        if /opt/theHarvester/.venv/bin/pip install -r /opt/theHarvester/requirements/base.txt >>"$INSTALL_LOG" 2>&1; then
+        /opt/theHarvester/.venv/bin/pip install --quiet --upgrade pip setuptools wheel >>"$INSTALL_LOG" 2>&1
+        if /opt/theHarvester/.venv/bin/pip install \
+                --no-cache-dir --retries 3 --timeout 60 \
+                -r /opt/theHarvester/requirements/base.txt >>"$INSTALL_LOG" 2>&1; then
             cat > /usr/local/bin/theHarvester <<'THEOF'
 #!/bin/sh
 exec /opt/theHarvester/.venv/bin/python /opt/theHarvester/theHarvester.py "$@"
@@ -187,7 +229,8 @@ THEOF
             chmod 755 /usr/local/bin/theHarvester
             log "theHarvester installed to /opt/theHarvester (launcher: theHarvester)"
         else
-            log "WARNING: theHarvester pip requirements install failed"
+            log "WARNING: theHarvester pip requirements install failed (last line:)"
+            sed -n '$p' "$INSTALL_LOG"
         fi
     else
         log "WARNING: theHarvester git clone failed"

@@ -267,19 +267,14 @@ class SecurityCenterWindow(Adw.ApplicationWindow):
                 "cannot guarantee no trace remains if swap was used."
             )
 
-        # Adw.AlertDialog only exists in libadwaita >= 1.4; bookworm ships
-        # 1.2, so use Adw.MessageDialog which has the same response API.
-        dialog = Adw.MessageDialog(
+        # Adw.AlertDialog / Adw.MessageDialog only exist in libadwaita >= 1.3
+        # (message for the latter: 1.5); bookworm ships 1.2, so any use would
+        # crash at click time. Fall back to a plain Gtk modal that exposes the
+        # same "response" signalling contract.
+        dialog = ConfirmDialog(
             heading="\u26a0 Emergency Shutdown",
             body="\n\n".join(body_lines),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("shutdown", "Shut Down & Clear Session")
-        dialog.set_response_appearance(
-            "shutdown", Adw.ResponseAppearance.DESTRUCTIVE
-        )
-        dialog.set_default_response("cancel")
-        dialog.set_close_response("cancel")
         dialog.connect("response", self._on_emergency_dialog_response)
         dialog.present(self)
 
@@ -293,6 +288,76 @@ class SecurityCenterWindow(Adw.ApplicationWindow):
         if not accepted:
             print("[security-center] Emergency Shutdown was refused — "
                   "check permissions/logs")
+
+
+class ConfirmDialog(Gtk.Window):
+    """Plain Gtk modal confirmation exposing a "response" signal.
+
+    libadwaita in bookworm is 1.2, which predates Adw.AlertDialog (1.3) and
+    Adw.MessageDialog (1.5). Those classes and their ResponseAppearance API
+    are therefore unavailable on the target OS; this window provides the same
+    two-button, "cancel" default, response-signal contract without them.
+    """
+
+    __gsignals__ = {
+        "response": (GLib.SignalFlags.RUN_LAST, None, (str,)),
+    }
+
+    RESPONSES = [
+        ("shutdown", "Shut Down & Clear Session", "destructive-action"),
+        ("cancel", "Cancel", None),
+    ]
+
+    def __init__(self, heading, body, **kwargs):
+        super().__init__(**kwargs)
+        self.set_title(heading)
+        self.set_default_size(420, -1)
+        self.set_resizable(False)
+        self.set_modal(True)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        content.set_margin_top(24)
+        content.set_margin_bottom(24)
+        content.set_margin_start(24)
+        content.set_margin_end(24)
+
+        title_label = Gtk.Label(label=heading, xalign=0)
+        title_label.add_css_class("title-1")
+        title_label.set_wrap(True)
+        content.append(title_label)
+
+        body_label = Gtk.Label(label=body, xalign=0)
+        body_label.set_wrap(True)
+        body_label.set_wrap_mode(3)  # GTK WrapMode.WORD_CHAR
+        body_label.set_xalign(0)
+        content.append(body_label)
+
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        button_box.set_halign(Gtk.Align.END)
+        for response_id, label, css_class in self.RESPONSES:
+            button = Gtk.Button(label=label)
+            if css_class:
+                button.add_css_class(css_class)
+            if response_id == "cancel":
+                button.set_can_default(True)
+                self.set_default_widget(button)
+            button.connect("clicked", self._on_button, response_id)
+            button_box.append(button)
+        content.append(button_box)
+
+        self.set_child(content)
+        self.connect("close-request", self._on_close_request)
+
+    def _on_button(self, button, response_id):
+        self._respond(response_id)
+
+    def _on_close_request(self, window):
+        self._respond("cancel")
+        return True
+
+    def _respond(self, response_id):
+        self.emit("response", response_id)
+        self.destroy()
 
 
 class SecurityCenterApp(Adw.Application):

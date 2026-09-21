@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ensure Tor daemon is running for LibreWolf's SOCKS5 backend
-if ! systemctl is-active --quiet tor; then
-    pkexec systemctl start tor
-fi
+# Ensure Tor daemon is running for LibreWolf's SOCKS5 backend.
+# Debian's tor package ships the template unit tor@default (tor.service is a
+# convenience/alias unit and does not run the daemon by itself).
+ensure_tor() {
+    if systemctl is-active --quiet tor@default; then
+        return 0
+    fi
+    if command -v pkexec >/dev/null 2>&1; then
+        pkexec systemctl start tor@default || true
+    else
+        systemctl start tor@default || true
+    fi
+    systemctl is-active --quiet tor@default
+}
+
+ensure_tor || true
 
 exec /usr/bin/librewolf "$@"

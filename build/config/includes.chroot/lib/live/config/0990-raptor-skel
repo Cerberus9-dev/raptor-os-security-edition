@@ -1,0 +1,41 @@
+#!/bin/sh
+# live-config component: ensure Raptor skel config is applied to the live user.
+# Runs from /lib/live/config/ (the ONLY directory live-config actually scans —
+# /usr/share/live-config/hooks/ is never executed), numbered 0990 so it runs
+# AFTER user-setup (0030) has created the account. Without this the live user
+# can end up with a stock Debian desktop (blue backdrop, default panel, no
+# Raptor menu) even though the payload ships in the image.
+
+set -e
+
+LIVE_USER="user"
+LIVE_HOME="/home/${LIVE_USER}"
+MARKER="${LIVE_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+
+# The user-setup component (0030) runs before us, but be defensive: wait briefly
+# for the account to exist before seeding its home directory.
+i=0
+while ! id "${LIVE_USER}" >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -ge 30 ] && break
+    sleep 1
+done
+
+if ! id "${LIVE_USER}" >/dev/null 2>&1; then
+    echo "[raptor-skel] WARNING: live user ${LIVE_USER} not found after 30s"
+    exit 0
+fi
+
+# Copy the whole skel tree over any defaults user-setup/adduser already laid
+# down. This is idempotent (same content each boot) and guarantees the Raptor
+# panel/theme/wallpaper config wins on first login.
+cp -rT /etc/skel/ "${LIVE_HOME}/"
+chown -R "${LIVE_USER}:${LIVE_USER}" "${LIVE_HOME}/"
+
+if [ -f "${MARKER}" ]; then
+    echo "[raptor-skel] seeded ${LIVE_HOME} with Raptor desktop config"
+else
+    echo "[raptor-skel] WARNING: skel copy ran but ${MARKER} is missing"
+fi
+
+exit 0

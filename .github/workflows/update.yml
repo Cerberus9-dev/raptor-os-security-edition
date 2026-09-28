@@ -27,6 +27,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Ubuntu 24.04 (which this workflow runs on) ships an AppArmor policy
+      # that restricts UNPRIVILEGED user namespaces. live-build's chroot
+      # stages shell out to debootstrap, which needs one. With the restriction
+      # active, the chroot stage dies immediately and the whole weekly update
+      # build fails. build-iso.yml already carries this step; it was never
+      # backported here, which is the single biggest reason the scheduled
+      # update run kept failing while the push-triggered build worked.
+      - name: Disable AppArmor restrictions for chroot
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       # Cache key includes the current ISO week — deliberately DIFFERENT
       # from build-iso.yml's permanent content-hash-only key. This
       # workflow's whole purpose is fetching fresh upstream Debian
@@ -59,20 +69,38 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-          live-build \
-          debootstrap \
-          debian-archive-keyring \
-          squashfs-tools \
-          xorriso \
-          isolinux \
-          syslinux-utils \
-          grub-efi-amd64-bin \
-          mtools \
-          dosfstools \
-          librsvg2-bin \
-          rsync
+          # The ubuntu-24.04 runner image preconfigures its OWN Google-Chrome
+          # apt repo (dl.google.com). Its index downloads are flaky (hash-sum
+          # mismatches that hard-fail `apt-get update`), and nothing in this
+          # build needs Chrome — drop that source up front so a mirror glitch
+          # can't kill the run, and keep retries for the Debian mirrors.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.list.save
+          sudo apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=5 \
+            live-build \
+            debootstrap \
+            debian-archive-keyring \
+            squashfs-tools \
+            xorriso \
+            isolinux \
+            syslinux \
+            syslinux-common \
+            syslinux-utils \
+            grub-efi-amd64-bin \
+            mtools \
+            dosfstools \
+            librsvg2-bin \
+            rsync
+
+          # The isolinux materialization step below copies ldlinux.c32 and
+          # vesamenu.c32 out of the syslinux package. Fail loudly HERE if they
+          # are missing, rather than letting the copy step fail with a bare
+          # "No such file or directory" forty minutes into the build.
+          for f in /usr/lib/ISOLINUX/isolinux.bin \
+                   /usr/lib/syslinux/modules/bios/ldlinux.c32 \
+                   /usr/lib/syslinux/modules/bios/vesamenu.c32; do
+            [ -f "$f" ] || { echo "ERROR: required syslinux asset missing: $f"; exit 1; }
+          done
 
       - name: Show build tool versions
         run: |
@@ -109,14 +137,29 @@ jobs:
           sudo sed -i '/SECURITY/ s#/updates#-security#g' "$LB_FILE"
           grep -n "VOLATILE" "$LB_FILE" | grep -- "-updates" || echo "WARNING: expected VOLATILE lines not found — investigate before trusting this build"
 
-      # Same fix as build-iso.yml — see that workflow's comment for the
-      # full explanation.
-      - name: Patch live-build isolinux theme paths
+      # live-build ships the isolinux template entries as SYMLINKS into
+      # Ubuntu host paths (/usr/lib/ISOLINUX/isolinux.bin etc.). lb_binary_syslinux
+      # copies that template into the Debian bookworm build chroot and
+      # dereferences the links there, where they dangle — bookworm's syslinux
+      # packages ship NO isolinux.bin at all (only /usr/lib/syslinux/modules/bios/).
+      # Drop REAL syslinux 6.04 binaries taken from the runner into the template
+      # instead of symlinks, so the chrooted copy is self-contained. All three
+      # come from the same syslinux 6.04 build, keeping versions consistent.
+      #
+      # This step previously re-pointed the symlinks (`ln -sf`) instead of
+      # copying, and omitted ldlinux.c32 entirely — i.e. it was still the
+      # pre-fix version while its comment claimed parity with build-iso.yml.
+      # That is why the BIOS bootloader step of the weekly rebuild kept
+      # failing while the push-triggered build worked.
+      - name: Materialize live-build isolinux template files (real, not symlinks)
         run: |
           set -e
           THEME_DIR="/usr/share/live/build/bootloaders/isolinux"
-          sudo ln -sf /usr/lib/ISOLINUX/isolinux.bin "$THEME_DIR/isolinux.bin"
-          sudo ln -sf /usr/lib/syslinux/modules/bios/vesamenu.c32 "$THEME_DIR/vesamenu.c32"
+          sudo rm -f "$THEME_DIR/isolinux.bin" "$THEME_DIR/ldlinux.c32" "$THEME_DIR/vesamenu.c32"
+          sudo cp /usr/lib/ISOLINUX/isolinux.bin "$THEME_DIR/isolinux.bin"
+          sudo cp /usr/lib/syslinux/modules/bios/ldlinux.c32 "$THEME_DIR/ldlinux.c32"
+          sudo cp /usr/lib/syslinux/modules/bios/vesamenu.c32 "$THEME_DIR/vesamenu.c32"
+          file "$THEME_DIR/isolinux.bin" "$THEME_DIR/ldlinux.c32" "$THEME_DIR/vesamenu.c32"
 
       # Same fix as build-iso.yml — see that workflow's comment for the
       # full explanation.
@@ -152,6 +195,15 @@ jobs:
         run: |
           sudo rm -rf chroot binary .build
           sudo rm -f config/bootstrap config/chroot config/binary config/common config/source config/cache
+          # Remove any ISO left over from an earlier run in this same working
+          # tree. Everything downstream discovers the image with
+          # `find . -maxdepth 1 -name '*.iso' -print -quit`, which returns an
+          # ARBITRARY match when more than one is present — so a stale ISO
+          # would let the whole pipeline "succeed" while shipping last week's
+          # image with none of this week's security updates. This workflow
+          # never renamed its output the way build-iso.yml does, which is
+          # exactly how a second ISO could end up in the directory.
+          find . -maxdepth 1 -type f \( -name '*.iso' -o -name '*.sha256' \) -delete
           echo "cache/ contents preserved:"
           du -sh cache 2>/dev/null || echo "cache/ is empty (first run this week, or nothing restored)"
           # Drop any pre-existing live-build stage snapshots so a poisoned one
@@ -177,7 +229,22 @@ jobs:
         working-directory: build
         run: |
           set -e
-          sed -i '/--systemd/d' ../auto/config || true
+
+          # ASSERT auto/config still pins systemd rather than mutating it.
+          # This step used to run `sed -i '/--systemd/d' ../auto/config`:
+          # that was a no-op (auto/config says `--initsystem systemd`, which
+          # does not contain the literal `--systemd`) that nonetheless edited
+          # a version-controlled file on every run. It read like a safety
+          # measure while doing nothing. Verify the real invariant instead —
+          # if --initsystem ever gets dropped, live-build silently defaults
+          # Debian-mode systems to sysvinit and then tries to install the
+          # hard-banned live-config-sysvinit, failing the build much later
+          # with a far less obvious error.
+          grep -q -- '--initsystem systemd' ../auto/config || {
+            echo "ERROR: auto/config no longer pins '--initsystem systemd'."
+            echo "Debian-mode live-build would fall back to sysvinit."
+            exit 1
+          }
 
           find config/package-lists/ -type f -name "*.list.chroot" -exec sed -i '/^sysvinit-core/d; /^live-config-sysvinit/d; /^initscripts/d; /^orphan-sysvinit-scripts/d' {} + || true
 
@@ -207,6 +274,38 @@ jobs:
       - name: Build updated ISO
         working-directory: build
         run: sudo lb build
+
+      # Gate the artifact on the payload actually being in the image. The
+      # squashfs is unpacked on the runner (squashfs-tools is installed above)
+      # and the build FAILS if /usr/lib/raptor-security is absent — there is no
+      # way to publish a "successful" weekly update that silently lost its
+      # customization layer. build-iso.yml has had this gate since the payload
+      # went missing once; this workflow never got it, so the update run would
+      # happily publish a hollow ISO.
+      - name: Assert Raptor payload is packed into the image
+        working-directory: build
+        run: |
+          set -e
+          SQ="binary/live/filesystem.squashfs"
+          [ -f "$SQ" ] || { echo "ERROR: $SQ not found"; ls -la binary/live/ 2>/dev/null; exit 1; }
+          if ! unsquashfs -n -ll "$SQ" 2>/dev/null | grep -q 'raptor-firstboot'; then
+            echo "ERROR: Raptor payload MISSING from the image — includes.chroot did not make it in."
+            echo "Top of squashfs listing for reference:"
+            unsquashfs -n -ll "$SQ" 2>/dev/null | head -20
+            exit 1
+          fi
+          echo "payload OK: raptor-firstboot.sh is in the image"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep -c 'usr/lib/raptor-security' | sed 's/^/raptor-security paths: /'
+          echo "panel config:"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep 'xfce4-panel.xml' || echo "WARNING: custom panel config absent (default XFCE panel used)"
+          echo "system-wide (xdg) xfce defaults:"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep -E 'etc/xdg/xfce4/xfconf/xfce-perchannel-xml/(xfce4-panel|xfce4-desktop|xsettings)\.xml' || echo "WARNING: /etc/xdg xfce defaults absent — desktop may fall back to Debian defaults"
+          echo "wallpaper:"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep 'backgrounds/raptor-dark.png' || echo "WARNING: custom wallpaper absent"
+          echo "lightdm autologin:"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep 'lightdm.conf.d/80-raptor-autologin.conf' || echo "WARNING: lightdm autologin config absent"
+          echo "boot report instrumentation:"
+          unsquashfs -n -ll "$SQ" 2>/dev/null | grep -E 'raptor-boot-report(\.sh|\.desktop)' || echo "WARNING: boot report instrument not found"
 
       - name: Verify ISO
         working-directory: build
@@ -261,17 +360,17 @@ jobs:
             printf '%s\n' 'insmod regexp'
             printf '\n'
             printf '%s\n' 'set default="0"'
-            printf '%s\n' 'set timeout=5'
+            printf '%s\n' 'set timeout=0'
             printf '\n'
             printf '%s\n' 'search --no-floppy --set=root --label RAPTOR-SECURITY'
             printf '\n'
             printf '%s\n' 'menuentry "Raptor Security (Live)" {'
-            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet ignore_uuid live-media-timeout=30'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet loglevel=3 ignore_uuid live-media-timeout=30 init_on_alloc=1 init_on_free=1 slab_nomerge page_poison=1 vsyscall=emulate oops=panic panic=30'
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
             printf '\n'
             printf '%s\n' 'menuentry "Raptor Security (Live, fail-safe)" {'
-            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet ignore_uuid live-media-timeout=30 noapic noapm nodma nomce nolapic nosmp'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin quiet loglevel=3 ignore_uuid live-media-timeout=30 init_on_alloc=1 init_on_free=1 slab_nomerge page_poison=1 vsyscall=emulate oops=panic panic=30 noapic noapm nodma nomce nolapic nosmp'
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
           } > efi-build/grub.cfg
@@ -327,6 +426,32 @@ jobs:
             mv "${ORIGINAL_ISO}.uefi" "$ORIGINAL_ISO"
           fi
 
+      # live-build writes the image as binary.hybrid.iso regardless of
+      # project naming. Give weekly updates a dated, product-named file so a
+      # published update is identifiable by date and can never be confused
+      # with the previous week's ISO (Internet Archive items are immutable —
+      # a given identifier can only be created once, so each build genuinely
+      # needs its own dated identifier).
+      - name: Rename ISO to product name
+        working-directory: build
+        run: |
+          set -e
+          ISO="$(find . -maxdepth 1 -type f -name '*.iso' -print -quit)"
+          [ -n "$ISO" ] || { echo "ERROR: no ISO found to rename."; exit 1; }
+          DATE="$(date -u +%Y%m%d)"
+          FINAL="raptor-security-${DATE}.iso"
+          # A second ISO here means `find -print -quit` may have handed us the
+          # wrong one; refuse rather than ship a renamed stale image.
+          COUNT="$(find . -maxdepth 1 -type f -name '*.iso' | wc -l)"
+          if [ "$COUNT" -ne 1 ]; then
+            echo "ERROR: expected exactly 1 ISO before rename, found $COUNT:"
+            find . -maxdepth 1 -type f -name '*.iso'
+            exit 1
+          fi
+          mv "$ISO" "$FINAL"
+          echo "Renamed to: $FINAL"
+          ls -lh "$FINAL"
+
       - name: Compute checksum
         working-directory: build
         run: |
@@ -346,6 +471,50 @@ jobs:
             build/raptor-security.sha256
           compression-level: 0
           retention-days: 30
+
+      # The artifact alone is not an update: nobody can install a 30-day-old
+      # GitHub artifact, and this workflow's entire reason to exist is getting
+      # upstream Debian security fixes in front of users. Publish to the same
+      # Internet Archive collection the README points at, using the official
+      # `ia` CLI so no upload endpoint is hand-rolled here.
+      #
+      # Gated on the IA_* secrets actually being configured — a fork or a
+      # maintainer without credentials still gets a green build and a usable
+      # artifact rather than a hard failure at the last step.
+      - name: Publish update to Internet Archive
+        if: ${{ vars.IA_COLLECTION != '' && secrets.IA_KEY != '' && secrets.IA_SECRET != '' }}
+        working-directory: build
+        env:
+          IA_KEY: ${{ secrets.IA_KEY }}
+          IA_SECRET: ${{ secrets.IA_SECRET }}
+          COLLECTION: ${{ vars.IA_COLLECTION }}
+        run: |
+          set -e
+          pip3 install --quiet --disable-pip-version-check internetarchive
+
+          ISO="$(find . -maxdepth 1 -type f -name '*.iso' -print -quit)"
+          STAMP="$(date -u +%Y%m%d)"
+          IDENTIFIER="raptor-os-security-${STAMP}"
+
+          echo "Publishing ${ISO} as ${IDENTIFIER} to collection ${COLLECTION}"
+          ia upload "$IDENTIFIER" "$ISO" raptor-security.sha256 \
+            --collection "$COLLECTION" \
+            --no-retries \
+            --log "$RUNNER_TEMP/ia-upload.log"
+          echo "Published: $IDENTIFIER"
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raptor-update-diagnostics
+          path: |
+            build/cache/*.log
+            build/cache/**/apt.log
+            build/config/auto/
+            ${{ runner.temp }}/ia-upload.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Same fix as build-iso.yml — see that workflow's comment for the
       # full explanation.

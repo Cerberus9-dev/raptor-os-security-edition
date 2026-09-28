@@ -75,6 +75,40 @@ if [ "$EXTRA_LISTS" -gt 0 ]; then
   ERRORS=$((ERRORS + 1))
 fi
 
+# A package list duplicated anywhere else (notably the repo root) is a trap:
+# live-build only ever reads build/config/package-lists/, so the copy nobody
+# reads quietly drifts out of sync and then gets edited instead of the real
+# one. This repo carried exactly that — a root-level raptor-security.list.chroot
+# missing librewolf/xfce4-whiskermenu-plugin/greybird-gtk-theme/
+# lightdm-gtk-greeter/syslinux-utils. Catch it before it comes back.
+STRAY_LISTS=$(find . -path ./.git -prune -o -type f -name '*.list.chroot' \
+  ! -path './build/config/package-lists/*' ! -path './build/config/archives/*' -print)
+if [ -n "$STRAY_LISTS" ]; then
+  echo "  [ERROR] Package list outside build/config/package-lists/ (dead copy — live-build never reads it):"
+  echo "$STRAY_LISTS" | sed 's/^/          /'
+  ERRORS=$((ERRORS + 1))
+fi
+
+# The systemd init packages must be pinned in the real list, otherwise
+# live-build's live-packages stage falls back to the hard-banned sysvinit path.
+LIST="build/config/package-lists/raptor-security.list.chroot"
+if ! grep -qx 'systemd-sysv' "$LIST" 2>/dev/null; then
+  echo "  [ERROR] $LIST does not pin systemd-sysv"
+  ERRORS=$((ERRORS + 1))
+fi
+if ! grep -qx 'live-config-systemd' "$LIST" 2>/dev/null; then
+  echo "  [ERROR] $LIST does not pin live-config-systemd"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# live-boot is what makes the initramfs honour `boot=live`. Without it the
+# image builds cleanly and then panics at boot with
+# "VFS: Unable to mount root fs on unknown-block(0,0)".
+if ! grep -qx 'live-boot' "$LIST" 2>/dev/null; then
+  echo "  [ERROR] $LIST does not pin live-boot (image would not boot)"
+  ERRORS=$((ERRORS + 1))
+fi
+
 if [ "$ERRORS" -gt 0 ]; then
   echo "[FAIL] Validation failed with $ERRORS error(s)."
   exit 1

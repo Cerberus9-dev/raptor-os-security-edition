@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# raptor-dashboard-bootstrap — robust Security Center autostart.
+#
+# The control-center autostart entries (both /etc/xdg and ~/.config ship one)
+# run this instead of exec'ing the dashboard directly. It (a) waits for the
+# Mode Manager D-Bus service so the dashboard never opens against a dead bus,
+# and (b) is idempotent — if both autostart copies fire, the second one sees
+# the first instance and exits, so we never get two windows.
+set -euo pipefail
+
+LOGFILE="/tmp/raptor-dashboard.log"
+exec >>"$LOGFILE" 2>&1
+echo "[$(date -Is)] raptor-dashboard-bootstrap: session start (DISPLAY=${DISPLAY:-<none>})"
+
+PIDFILE="/tmp/raptor-dashboard.pid"
+if [ -f "$PIDFILE" ]; then
+    OLD_PID="$(cat "$PIDFILE" 2>/dev/null || echo '')"
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "[$(date -Is)] dashboard already running (pid $OLD_PID) — exiting"
+        exit 0
+    fi
+fi
+
+# Ship our pid early so a racing duplicate exits before we even exec.
+echo "$$" > "$PIDFILE"
+
+echo "[$(date -Is)] waiting for org.raptor.ModeManager on the system bus"
+for _ in $(seq 1 45); do
+    if busctl --system --no-pager list 2>/dev/null | grep -q 'org\.raptor\.ModeManager'; then
+        break
+    fi
+    sleep 1
+done
+
+echo "[$(date -Is)] launching raptor-security-center"
+exec /usr/bin/python3 /usr/lib/raptor-security/raptor_security_center.py "$@"

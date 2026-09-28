@@ -23,7 +23,7 @@ echo "[0210] installed Raptor XFCE defaults into $XDG_XFCONF"
 cat > /etc/lightdm/lightdm-gtk-greeter.conf <<'EOF'
 [greeter]
 theme-name=Greybird-dark
-icon-theme-name=Adwaita
+icon-theme-name=Papirus-Dark
 background=/usr/share/backgrounds/raptor-dark.png
 background-color=#141414
 # Keep the greeter minimal — no theme-selection clutter on a live security OS.

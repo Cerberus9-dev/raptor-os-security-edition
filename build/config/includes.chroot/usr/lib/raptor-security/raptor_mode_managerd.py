@@ -121,6 +121,7 @@ class ModeManager:
         ok &= self._apply_firewall(mode)
         ok &= self._apply_sysctl(mode)
         ok &= self._apply_services(mode)
+        ok &= self._configure_dns()
 
         if ok:
             CURRENT_MODE_FILE.write_text(mode + "\n")
@@ -271,7 +272,31 @@ class ModeManager:
         _, out, _ = run(["systemctl", "is-active", "tor@default"], check=False)
         return "active" if out.strip() == "active" else "inactive"
 
+    def _configure_dns(self) -> bool:
+        """
+        Points /etc/resolv.conf at the local DNS-over-Tor resolver whenever it
+        is running (127.0.0.1:53 -> dnsmasq -> Tor DNSPort 9053). This is what
+        actually prevents application DNS queries from leaking to the uplink's
+        clearnet resolver — the .services files only ensure dnsmasq/tor are
+        running. In Lockdown the services are stopped and the firewall drops
+        everything, so the same nameserver simply fails closed.
+        """
+        try:
+            resolver = Path("/etc/resolv.conf")
+            target = "nameserver 127.0.0.1\noptions single-request-reopen\n"
+            try:
+                if resolver.read_text() == target:
+                    return True
+            except OSError:
+                pass
+            resolver.write_text(target)
+            return True
+        except OSError as e:
+            log.warning("could not point resolv.conf at local resolver: %s", e)
+            return False
+
     def _check_mac_randomization(self) -> str:
+        # Per-connection setting reported by nmcli...
         rc, out, _ = run(
             ["nmcli", "-t", "-f", "802-11-wireless.cloned-mac-address",
              "connection", "show"],
@@ -279,7 +304,19 @@ class ModeManager:
         )
         if rc != 0:
             return "unknown"
-        return "enabled" if "random" in out.lower() or "stable" in out.lower() else "disabled"
+        if "random" in out.lower() or "stable" in out.lower():
+            return "enabled"
+        # ...plus the global default from the packaged NetworkManager conf.
+        # nmcli reports per-connection values only; with nothing customized
+        # per connection the randomized default still applies at activation
+        # time, so a conf.d default counts as enabled too.
+        try:
+            nm_conf = Path("/etc/NetworkManager/conf.d/10-raptor-hardening.conf")
+            if nm_conf.exists() and "cloned-mac-address=random" in nm_conf.read_text():
+                return "enabled"
+        except OSError:
+            pass
+        return "disabled"
 
     def _check_persistence(self) -> str:
         rc, _, _ = run(["findmnt", "-n", "/lib/live/mount/persistence"], check=False)
@@ -418,20 +455,24 @@ class ModeManager:
             return "unknown"
 
     def _check_dns(self) -> str:
+        # Whichever resolver the system would actually use right now, read
+        # from /etc/resolv.conf itself. With NM dns=none this file is owned
+        # by _configure_dns (127.0.0.1 = DNS over Tor); anything else on this
+        # line means a clearnet resolver is in effect and should be reported
+        # as-is rather than "(via Tor)".
         try:
-            rc, out, _ = run(
-                ["nmcli", "-t", "-f", "IP4.DNS", "device", "show"],
-                check=False,
-            )
-            if rc != 0:
+            nameservers = []
+            with open("/etc/resolv.conf") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[0] == "nameserver":
+                        nameservers.append(parts[1])
+            if not nameservers:
                 return "unknown"
-            servers = [
-                entry.split(":")[-1]
-                for entry in out.splitlines()
-                if entry.startswith("IP4.DNS:")
-            ]
-            return ", ".join(servers) if servers else "unknown"
-        except Exception as e:
+            if nameservers == ["127.0.0.1"]:
+                return "via Tor (127.0.0.1)"
+            return ", ".join(nameservers)
+        except OSError as e:
             log.warning("dns check failed: %s", e)
             return "unknown"
 

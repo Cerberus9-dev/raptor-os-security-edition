@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=HashID
+Comment=Identify password hash types
+Exec=hashid
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Passwords;

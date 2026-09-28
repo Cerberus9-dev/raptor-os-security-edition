@@ -3,4 +3,11 @@
 # NOTE: nftables must NOT be toggled here — its ExecStart/ExecStop both
 # `nft flush ruleset`, which would wipe the {mode}.nft table loaded just
 # before this step. The firewall is owned by _apply_firewall() only.
+#
+# Secure is this OS's privacy baseline, so Tor and its DNS resolver run here
+# too (dnsmasq forwards 127.0.0.1:53 -> Tor DNSPort 9053; Mode Manager points
+# resolv.conf at 127.0.0.1 once these are up, so queries never touch the
+# clearnet).
 + NetworkManager
++ tor@default
++ dnsmasq

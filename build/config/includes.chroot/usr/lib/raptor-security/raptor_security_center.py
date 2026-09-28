@@ -24,6 +24,13 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 from pydbus import SystemBus  # noqa: E402
 
+from collections import deque  # noqa: E402
+
+try:
+    import cairo  # noqa: E402
+except ImportError:  # pragma: no cover - python3-cairo absent
+    cairo = None
+
 BUS_NAME = "org.raptor.ModeManager"
 OBJECT_PATH = "/org/raptor/ModeManager"
 
@@ -118,11 +125,16 @@ class SecurityCenterWindow(Adw.ApplicationWindow):
         self._build_mode_header(content)
         self._build_security_panel(content)
         self._build_system_panel(content)
+        self._build_graphs(content)
         self._build_network_panel(content)
         self._build_emergency(content)
 
         self.refresh_status()
         GLib.timeout_add_seconds(5, self._on_timer_tick)
+        # Live graphs sample on their own faster tick; 1s gives a useful
+        # 60-sample (1 min) window without any real cost.
+        self._net_prev = {"rx": 0, "tx": 0}
+        GLib.timeout_add_seconds(1, self._on_graph_tick)
 
     # -- layout helpers ----------------------------------------------------
 
@@ -187,6 +199,96 @@ class SecurityCenterWindow(Adw.ApplicationWindow):
             row = self._row(panel, label)
             row.set_activatable(False)
             self.network_rows[field] = row
+
+    # -- live performance graphs ------------------------------------------
+
+    def _build_graphs(self, parent):
+        if cairo is None:
+            return
+
+        section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        heading = Gtk.Label(label="Live Performance", xalign=0)
+        heading.add_css_class("title-4")
+        section.append(heading)
+
+        grid = Gtk.Grid(column_spacing=16, row_spacing=16, hexpand=True)
+        grid.set_halign(Gtk.Align.FILL)
+        self.cpu_graph = MetricGraph("CPU", "%", "{:.0f}%", (0.36, 0.72, 0.98))
+        self.mem_graph = MetricGraph("Memory", "%", "{:.0f}%", (0.42, 0.88, 0.62))
+        self.net_rx_graph = MetricGraph("Net down", "KB/s", "{:.1f}", (0.98, 0.55, 0.35))
+        self.net_tx_graph = MetricGraph("Net up", "KB/s", "{:.1f}", (0.93, 0.42, 0.72))
+
+        self.cpu_graph.set_ylabel("%")
+        self.mem_graph.set_ylabel("%")
+        self.net_rx_graph.set_ylabel("KB/s")
+        self.net_tx_graph.set_ylabel("KB/s")
+        grid.attach(self.cpu_graph.widget, 0, 0, 1, 1)
+        grid.attach(self.mem_graph.widget, 1, 0, 1, 1)
+        grid.attach(self.net_rx_graph.widget, 0, 1, 1, 1)
+        grid.attach(self.net_tx_graph.widget, 1, 1, 1, 1)
+        section.append(grid)
+        parent.append(section)
+
+    def _on_graph_tick(self):
+        self._sample_cpu()
+        self._sample_memory()
+        self._sample_network()
+        return True  # keep ticking
+
+    def _sample_cpu(self):
+        try:
+            with open("/proc/stat") as f:
+                parts = f.readline().split()
+            vals = [int(x) for x in parts[1:] if x.isdigit()]
+            if len(vals) < 4:
+                return
+            total = sum(vals)
+            idle = vals[3]
+            prev = getattr(self, "_cpu_prev", None)
+            self._cpu_prev = (total, idle)
+            if prev:
+                d_total = total - prev[0]
+                d_idle = idle - prev[1]
+                if d_total > 0:
+                    pct = max(0.0, min(100.0, (1 - d_idle / d_total) * 100.0))
+                    self.cpu_graph.push(pct)
+        except OSError:
+            pass
+
+    def _sample_memory(self):
+        try:
+            with open("/proc/meminfo") as f:
+                data = dict(line.split(":", 1) for line in f)
+            total = int(data["MemTotal"].strip().split()[0])
+            available = int(data["MemAvailable"].strip().split()[0])
+            if total > 0:
+                pct = max(0.0, min(100.0, (1 - available / total) * 100.0))
+                self.mem_graph.push(pct)
+        except (OSError, KeyError, ValueError):
+            pass
+
+    def _sample_network(self):
+        try:
+            rx = tx = 0
+            with open("/proc/net/dev") as f:
+                f.readline(); f.readline()
+                for line in f:
+                    if ":" not in line:
+                        continue
+                    name, rest = line.split(":", 1)
+                    if name.strip() == "lo":
+                        continue
+                    fields = rest.split()
+                    rx += int(fields[0])
+                    tx += int(fields[8])
+            prev = self._net_prev
+            d_rx = max(0, rx - prev["rx"]) / 1024.0
+            d_tx = max(0, tx - prev["tx"]) / 1024.0
+            prev["rx"], prev["tx"] = rx, tx
+            self.net_rx_graph.push(d_rx)
+            self.net_tx_graph.push(d_tx)
+        except (OSError, IndexError, ValueError):
+            pass
 
     def _build_emergency(self, parent):
         emergency_btn = Gtk.Button(label="Emergency Shutdown & Clear Session")
@@ -288,6 +390,105 @@ class SecurityCenterWindow(Adw.ApplicationWindow):
         if not accepted:
             print("[security-center] Emergency Shutdown was refused — "
                   "check permissions/logs")
+
+
+class MetricGraph:
+    """A small labeled cairo sparkline updating in place.
+
+    Uses a Gtk.DrawingArea redrawn on every push(); the draw callbacks scale
+    samples to the widget's current width so a stretched window just draws
+    more history. Falls back gracefully anywhere cairo is missing by being
+    replaced with a plain bar at construction time (see SecurityCenterWindow
+    respecting the module-level cairo guard).
+    """
+
+    BG = (0.055, 0.062, 0.075)
+    GRID = (0.25, 0.28, 0.33)
+
+    def __init__(self, title, unit, fmt, color, history=60):
+        self.title = title
+        self.unit = unit
+        self.fmt = fmt
+        self.color = color
+        self.whole_color = tuple(1 - c for c in color)
+        self.samples = deque(maxlen=history)
+
+        self.widget = Gtk.DrawingArea()
+        self.widget.set_hexpand(True)
+        self.widget.set_vexpand(False)
+        self.widget.set_size_request(240, 72)
+        self.widget.set_draw_func(self._draw, None)
+
+    def set_ylabel(self, text):
+        pass  # width of the legend text is configured via the title
+
+    def push(self, value):
+        self.samples.append(value)
+        self.widget.queue_draw()
+
+    def _draw(self, area, ctx, width, height, data):
+        ctx.set_source_rgb(*self.BG)
+        ctx.paint()
+
+        if not self.samples:
+            self._draw_label(ctx, width, "idle")
+            return
+
+        lo = float(min(self.samples))
+        hi = float(max(self.samples))
+        if hi > lo:
+            span = hi - lo
+        else:
+            span = max(hi, 1.0)
+        pad = span * 0.1
+        lo -= pad
+        hi += pad
+        span = (hi - lo) or 1.0
+
+        # gridlines
+        ctx.set_source_rgba(1, 1, 1, 0.05)
+        ctx.set_line_width(1)
+        for frac in (0.25, 0.5, 0.75):
+            y = height - (height * frac)
+            ctx.move_to(0, y)
+            ctx.line_to(width, y)
+            ctx.stroke()
+
+        # area under the line
+        ctx.move_to(0, height)
+        for i, v in enumerate(self.samples):
+            x = (i / (len(self.samples) - 1)) * width
+            y = height - ((v - lo) / span) * (height - 12)
+            ctx.line_to(x, y)
+        ctx.line_to(width, height)
+        ctx.close_path()
+        ctx.set_source_rgba(self.color[0], self.color[1], self.color[2], 0.18)
+        ctx.fill()
+
+        # the line
+        ctx.new_path()
+        for i, v in enumerate(self.samples):
+            x = (i / (len(self.samples) - 1)) * width
+            y = height - ((v - lo) / span) * (height - 12)
+            if i == 0:
+                ctx.move_to(x, y)
+            else:
+                ctx.line_to(x, y)
+        ctx.set_source_rgb(*self.color)
+        ctx.set_line_width(1.6)
+        ctx.stroke()
+
+        self._draw_label(ctx, width, self.fmt.format(self.samples[-1]))
+
+    def _draw_label(self, ctx, width, value_text):
+        ctx.select_font_face("Sans",
+                             cairo.FONT_SLANT_NORMAL,
+                             cairo.FONT_WEIGHT_NORMAL)
+        ctx.set_font_size(11)
+        text = f"{self.title}: {value_text}"
+        ctx.set_source_rgba(1, 1, 1, 0.85)
+        ctx.move_to(6, 14)
+        ctx.show_text(text)
 
 
 class ConfirmDialog(Gtk.Window):

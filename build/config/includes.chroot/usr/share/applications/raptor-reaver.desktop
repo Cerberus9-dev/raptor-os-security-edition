@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Reaver
+Comment=WPS attack tool
+Exec=reaver
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

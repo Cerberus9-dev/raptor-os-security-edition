@@ -10,37 +10,67 @@
     <property name="position-locked" type="bool" value="true"/>
     <property name="length" type="uint" value="100"/>
     <property name="length-adjust" type="bool" value="true"/>
-    <property name="size" type="uint" value="36"/>
+    <property name="size" type="uint" value="34"/>
+    <property name="background-style" type="int" value="1"/>
     <property name="plugin-ids" type="array">
       <value name="0" type="int" value="1"/>
       <value name="1" type="int" value="2"/>
       <value name="2" type="int" value="3"/>
       <value name="3" type="int" value="4"/>
       <value name="4" type="int" value="5"/>
+      <value name="5" type="int" value="6"/>
+      <value name="6" type="int" value="7"/>
     </property>
   </property>
   <property name="plugins" type="dict">
     <property name="plugin-1" type="dict">
       <property name="type" type="string" value="whiskermenu"/>
       <property name="active" type="bool" value="true"/>
+      <property name="whiskermenu" type="dict">
+        <property name="button-title" type="string" value="Raptor Security"/>
+        <property name="button-icon" type="string" value="raptor-security"/>
+      </property>
     </property>
     <property name="plugin-2" type="dict">
-      <property name="type" type="string" value="tasklist"/>
+      <property name="type" type="string" value="launcher"/>
       <property name="active" type="bool" value="true"/>
+      <property name="items" type="array">
+        <value name="0" type="string" value="xfce4-terminal.desktop"/>
+        <value name="1" type="string" value="librewolf.desktop"/>
+        <value name="2" type="string" value="thunar.desktop"/>
+        <value name="3" type="string" value="raptor-security-center.desktop"/>
+        <value name="4" type="string" value="xfce4-settings-manager.desktop"/>
+      </property>
     </property>
     <property name="plugin-3" type="dict">
-      <property name="type" type="string" value="pager"/>
+      <property name="type" type="string" value="separator"/>
       <property name="active" type="bool" value="true"/>
     </property>
     <property name="plugin-4" type="dict">
-      <property name="type" type="string" value="systray"/>
+      <property name="type" type="string" value="tasklist"/>
       <property name="active" type="bool" value="true"/>
+      <property name="grouping" type="int" value="1"/>
     </property>
     <property name="plugin-5" type="dict">
+      <property name="type" type="string" value="genmon"/>
+      <property name="active" type="bool" value="true"/>
+      <property name="genmon" type="dict">
+        <property name="genmon-command" type="string" value="/usr/share/raptor-security/panel-load.sh"/>
+        <property name="genmon-period" type="int" value="5000"/>
+        <property name="genmon-space" type="int" value="2"/>
+      </property>
+    </property>
+    <property name="plugin-6" type="dict">
+      <property name="type" type="string" value="systray"/>
+      <property name="active" type="bool" value="true"/>
+      <property name="show-frame" type="bool" value="false"/>
+    </property>
+    <property name="plugin-7" type="dict">
       <property name="type" type="string" value="clock"/>
       <property name="active" type="bool" value="true"/>
       <property name="clock" type="dict">
-        <property name="digital-time-format" type="string" value="%H:%M"/>
+        <property name="digital-time-format" type="string" value="%R"/>
+        <property name="digital-time-font" type="string" value="Sans 11"/>
       </property>
     </property>
   </property>

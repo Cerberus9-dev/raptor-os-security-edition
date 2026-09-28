@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Onion Circuits
+Comment=Tor circuit status monitor
+Exec=onioncircuits
+Icon=onioncircuits
+Terminal=false
+Categories=System;Security;X-Raptor-Tor;

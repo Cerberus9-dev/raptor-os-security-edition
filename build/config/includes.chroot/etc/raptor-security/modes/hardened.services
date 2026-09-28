@@ -1,7 +1,10 @@
 # Hardened mode service posture — full Tor isolation plus NetworkManager
 # (wireguard/openvpn control and MAC randomization rely on nmcli).
+# dnsmasq forwards local DNS to Tor's DNSPort (9053) and is what resolv.conf
+# points at, keeping application queries off the clearnet.
 # nftables is deliberately NOT listed: toggling it would `nft flush
 # ruleset` and destroy the hardened.nft table. Firewall is owned by
 # _apply_firewall() only.
 + NetworkManager
 + tor@default
++ dnsmasq

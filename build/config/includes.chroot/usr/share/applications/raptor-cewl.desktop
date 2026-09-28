@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CeWL
+Comment=Wordlist generator from target site
+Exec=cewl
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

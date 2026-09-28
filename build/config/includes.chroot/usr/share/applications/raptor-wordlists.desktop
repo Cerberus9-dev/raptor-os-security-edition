@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wordlists
+Comment=Browse bundled wordlist sets
+Exec=xfce4-terminal --working-directory=/usr/share/wordlists
+Icon=utilities-terminal
+Terminal=false
+Categories=System;Security;X-Raptor-Passwords;

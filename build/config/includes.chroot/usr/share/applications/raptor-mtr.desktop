@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MTR
+Comment=Network diagnostic (ping+traceroute)
+Exec=mtr
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

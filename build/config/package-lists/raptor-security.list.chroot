@@ -18,7 +18,9 @@ live-boot-initramfs-tools
 xfce4
 xfce4-goodies
 xfce4-whiskermenu-plugin
+xfce4-genmon-plugin
 greybird-gtk-theme
+papirus-icon-theme
 lightdm
 lightdm-gtk-greeter
 
@@ -46,6 +48,9 @@ wireguard-tools
 openvpn
 dnsutils
 stubby
+dnsmasq
+nyx
+onioncircuits
 
 # --- Anti-Forensics & Encryption ---
 secure-delete
@@ -61,6 +66,8 @@ netdiscover
 arp-scan
 dnsrecon
 dnsenum
+dmitry
+whatweb
 whois
 traceroute
 onesixtyone
@@ -74,12 +81,15 @@ socat
 proxychains4
 dsniff
 bettercap
+mtr
 
 # --- Web Application Security ---
 nikto
 gobuster
 wfuzz
 dirb
+dirbuster
+cewl
 sqlmap
 wapiti
 
@@ -88,9 +98,15 @@ john
 hashcat
 hydra
 medusa
+hashid
+crunch
+wordlists
+exploitdb
 
 # --- Wireless Auditing ---
 aircrack-ng
+reaver
+hostapd
 
 # --- Forensics & Steganography ---
 binwalk
@@ -99,6 +115,10 @@ steghide
 exiftool
 testdisk
 sleuthkit
+guymager
+dcfldd
+scalpel
+p7zip-full
 
 # --- Sandboxing & Hardening ---
 firejail
@@ -112,3 +132,7 @@ wget
 git
 htop
 ca-certificates
+gnome-system-monitor
+tmux
+vim
+swaks

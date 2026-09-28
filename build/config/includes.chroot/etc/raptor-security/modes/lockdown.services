@@ -1,10 +1,12 @@
 # Lockdown mode service posture — sever radios and network services.
 # NetworkManager controls the physical NICs, so stopping it (plus the
 # chain policy drop in lockdown.nft) is what actually cuts the
-# machine off. Tor is stopped too — a degraded/partial tunnel in lockdown
-# contradicts the mode's "no outbound" promise.
+# machine off. Tor, dnsmasq and NetworkManager are all stopped — a
+# degraded/partial tunnel in lockdown contradicts the mode's "no outbound"
+# promise.
 # nftables must NOT be toggled: its ExecStop runs `nft flush ruleset`,
 # which would silently remove the lockdown kill-switch table the daemon
 # loaded right before this step.
 - NetworkManager
 - tor@default
+- dnsmasq

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Welcome
+Comment=First-login welcome and orientation
+Exec=/usr/lib/raptor-security/raptor-welcome.py
+Type=Application
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=XFCE;X-GNOME-Old;

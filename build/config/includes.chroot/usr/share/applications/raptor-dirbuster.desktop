@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=DirBuster
-Comment=Web directory brute forcer
-Exec=dirbuster
-Icon=utilities-terminal
-Terminal=false
-Categories=System;Security;X-Raptor-Web;

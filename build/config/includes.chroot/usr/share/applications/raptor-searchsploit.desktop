@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Searchsploit
-Comment=Exploit Database search
-Exec=searchsploit
-Icon=utilities-terminal
-Terminal=true
-Categories=System;Security;X-Raptor-Recon;

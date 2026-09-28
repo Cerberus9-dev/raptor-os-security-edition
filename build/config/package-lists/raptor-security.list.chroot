@@ -88,7 +88,6 @@ nikto
 gobuster
 wfuzz
 dirb
-dirbuster
 cewl
 sqlmap
 wapiti
@@ -100,8 +99,7 @@ hydra
 medusa
 hashid
 crunch
-wordlists
-exploitdb
+# Note: `wordlists`/`exploitdb` (Kali) are not packaged in Debian bookworm.
 
 # --- Wireless Auditing ---
 aircrack-ng

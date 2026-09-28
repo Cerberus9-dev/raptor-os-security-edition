@@ -481,8 +481,27 @@ jobs:
       # Gated on the IA_* secrets actually being configured — a fork or a
       # maintainer without credentials still gets a green build and a usable
       # artifact rather than a hard failure at the last step.
+      #
+      # NOTE: `secrets` cannot be referenced inside an `if:` expression
+      # (GitHub rejects it at workflow-parse time with "Unrecognized
+      # named-value: 'secrets'", which fails the whole run with zero jobs
+      # before anything starts). Secrets ARE available in `env`, so the gate
+      # is computed into an output here and consumed as `steps.*.outputs.*`.
+      - name: Compute IA publish gate
+        id: ia-gate
+        env:
+          IA_COLLECTION: ${{ vars.IA_COLLECTION }}
+          IA_KEY: ${{ secrets.IA_KEY }}
+          IA_SECRET: ${{ secrets.IA_SECRET }}
+        run: |
+          if [ -n "${IA_COLLECTION:-}" ] && [ -n "${IA_KEY:-}" ] && [ -n "${IA_SECRET:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish update to Internet Archive
-        if: ${{ vars.IA_COLLECTION != '' && secrets.IA_KEY != '' && secrets.IA_SECRET != '' }}
+        if: steps.ia-gate.outputs.enabled == 'true'
         working-directory: build
         env:
           IA_KEY: ${{ secrets.IA_KEY }}

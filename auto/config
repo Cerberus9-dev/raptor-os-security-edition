@@ -32,5 +32,4 @@ lb config noauto "${@}" \
     --apt-indices false \
     --apt-recommends true \
     --cache-stages "" \
-    --compression gzip \
-    --bootappend-live "boot=live config components username=user autologin quiet loglevel=3 ignore_uuid live-media-timeout=30 init_on_alloc=1 init_on_free=1 slab_nomerge page_poison=1 vsyscall=emulate oops=panic panic=30"
+    --bootappend-live "boot=live config components username=user autologin ignore_uuid live-media-timeout=30"

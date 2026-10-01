@@ -1,7 +1,7 @@
 [Unit]
 Description=Copy /etc/skel to live user home (fallback for live-config)
-Before=lightdm.service
-After=local-fs.target live-config.service
+Before=lightdm.service display-manager.service
+After=local-fs.target systemd-user-sessions.service live-config.service
 ConditionPathExists=/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
 
 [Service]

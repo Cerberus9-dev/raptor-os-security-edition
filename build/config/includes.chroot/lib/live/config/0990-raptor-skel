@@ -1,41 +1,58 @@
 #!/bin/sh
-# live-config component: ensure Raptor skel config is applied to the live user.
-# Runs from /lib/live/config/ (the ONLY directory live-config actually scans —
-# /usr/share/live-config/hooks/ is never executed), numbered 0990 so it runs
-# AFTER user-setup (0030) has created the account. Without this the live user
-# can end up with a stock Debian desktop (blue backdrop, default panel, no
-# Raptor menu) even though the payload ships in the image.
-
-set -e
+# live-config component: seed the live user's home with the Raptor desktop.
+#
+# CRITICAL CONTEXT: live-config executes this from the INITRAMFS, with the
+# real root filesystem mounted at /root (this is exactly how live-config's
+# own components operate — see user-setup, which does `chroot /root getent
+# passwd "$LIVE_USERNAME"`). Running `cp`/`id`/`chown` against the bare /
+# here would touch the initrd's throwaway filesystem and be discarded at
+# switch_root, which is why the skel config never reached /home/user and the
+# desktop came up stock blue. Every write therefore goes through `chroot`.
+#
+# Runs numbered 0990 so it comes AFTER live-config's user-setup (0030), which
+# is what creates the `user` account. The /etc/skel content (panel, theme,
+# wallpaper, autostart) is shipped in the image, so this one copy makes the
+# whole Raptor desktop take effect on first login.
+#
+# An ENFORCED BACKUP exists too: the systemd unit raptor-copy-skel.service
+# (enabled under multi-user.target.wants) performs the same copy in the real,
+# booted userspace before lightdm starts. Both are idempotent.
 
 LIVE_USER="user"
-LIVE_HOME="/home/${LIVE_USER}"
-MARKER="${LIVE_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+MARKER=".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
 
-# The user-setup component (0030) runs before us, but be defensive: wait briefly
-# for the account to exist before seeding its home directory.
+# Locate the real root: /root when live-config runs from the initramfs,
+# `/` when invoked from a system that IS the real root. `chroot /` is safe.
+if [ -d /root/etc/skel ] || [ -d /root/home ]; then
+    ROOT=/root
+else
+    ROOT=/
+fi
+
+# user-setup (0030) runs before us, but wait defensively for the account
+# (live-config may run components in parallel).
 i=0
-while ! id "${LIVE_USER}" >/dev/null 2>&1; do
+while ! chroot "$ROOT" id "$LIVE_USER" >/dev/null 2>&1; do
     i=$((i + 1))
     [ "$i" -ge 30 ] && break
     sleep 1
 done
 
-if ! id "${LIVE_USER}" >/dev/null 2>&1; then
-    echo "[raptor-skel] WARNING: live user ${LIVE_USER} not found after 30s"
+if ! chroot "$ROOT" id "$LIVE_USER" >/dev/null 2>&1; then
+    echo "[raptor-skel] WARNING: live user ${LIVE_USER} not found after 30s (root=$ROOT)"
     exit 0
 fi
 
-# Copy the whole skel tree over any defaults user-setup/adduser already laid
-# down. This is idempotent (same content each boot) and guarantees the Raptor
-# panel/theme/wallpaper config wins on first login.
-cp -rT /etc/skel/ "${LIVE_HOME}/"
-chown -R "${LIVE_USER}:${LIVE_USER}" "${LIVE_HOME}/"
+if [ ! -d "$ROOT/etc/skel/.config" ]; then
+    echo "[raptor-skel] WARNING: /etc/skel in ${ROOT} has no .config — nothing to seed"
+    exit 0
+fi
 
-if [ -f "${MARKER}" ]; then
-    echo "[raptor-skel] seeded ${LIVE_HOME} with Raptor desktop config"
+chroot "$ROOT" /bin/sh -c 'cp -a /etc/skel/. /home/user/ && chown -R user:user /home/user'
+if [ -f "$ROOT/home/$LIVE_USER/$MARKER" ]; then
+    echo "[raptor-skel] seeded /home/${LIVE_USER} with Raptor desktop config"
 else
-    echo "[raptor-skel] WARNING: skel copy ran but ${MARKER} is missing"
+    echo "[raptor-skel] WARNING: copy ran but ${MARKER} is missing in ${ROOT}/home/${LIVE_USER}"
 fi
 
 exit 0

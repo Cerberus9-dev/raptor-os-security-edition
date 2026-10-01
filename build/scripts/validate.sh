@@ -6,6 +6,7 @@ ERRORS=0
 echo "==> [1/4] Enforcing & Verifying Executable Permissions..."
 chmod +x build/config/includes.chroot/usr/local/bin/* 2>/dev/null || true
 chmod +x build/config/hooks/*.hook.chroot 2>/dev/null || true
+chmod +x build/config/includes.chroot/lib/live/config/* 2>/dev/null || true
 
 for script in build/config/includes.chroot/usr/local/bin/*; do
   if [ -f "$script" ] && [ ! -x "$script" ]; then
@@ -61,6 +62,38 @@ if [ ! -f "build/config/includes.chroot/etc/xdg/xfce4/panel/whiskermenu-1.rc" ];
   echo "  [ERROR] Missing whiskermenu config: build/config/includes.chroot/etc/xdg/xfce4/panel/whiskermenu-1.rc"
   ERRORS=$((ERRORS + 1))
 fi
+
+# Check for loop over live-config hooks: live-config only runs EXECUTABLE
+# components under /lib/live/config — a 0644 file is silently skipped and the
+# desktop comes up stock. Enforced here + `chmod +x` one stage above.
+for lc in build/config/includes.chroot/lib/live/config/*; do
+  if [ -f "$lc" ] && [ ! -x "$lc" ]; then
+    echo "  [ERROR] live-config component not executable (never runs): $lc"
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+# skel-copy backup service MUST be enabled: the primary mechanism is the
+# 0990 live-config hook; if that ever gets skipped the multi-user.target
+# symlink below is the real-userspace safety net that makes the desktop
+# theme apply. If it goes missing the two mechanisms silently diverge.
+if [ ! -e "build/config/includes.chroot/etc/systemd/system/multi-user.target.wants/raptor-copy-skel.service" ]; then
+  echo "  [ERROR] raptor-copy-skel.service not enabled (missing multi-user.target.wants symlink)"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# The per-user autostart copies must exist so the Security Center and
+# welcome dialog come up automatically regardless of which skel took.
+for skel_rc in \
+    "build/config/includes.chroot/etc/xdg/autostart/raptor-control-center.desktop" \
+    "build/config/includes.chroot/etc/skel/.config/autostart/raptor-control-center.desktop" \
+    "build/config/includes.chroot/etc/skel/.config/xfce4/panel/whiskermenu-1.rc" \
+    "build/config/includes.chroot/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"; do
+  if [ ! -f "$skel_rc" ]; then
+    echo "  [ERROR] Missing skel/autostart payload: $skel_rc"
+    ERRORS=$((ERRORS + 1))
+  fi
+done
 
 # Check for raptor-security icon
 if [ ! -f "build/config/includes.chroot/usr/share/icons/hicolor/48x48/apps/raptor-security.svg" ]; then

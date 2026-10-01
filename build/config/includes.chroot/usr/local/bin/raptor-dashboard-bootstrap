@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# raptor-dashboard-bootstrap — robust Security Center autostart.
+# raptor-dashboard-bootstrap — robust, automatic Security Center autostart.
 #
-# The control-center autostart entries (both /etc/xdg and ~/.config ship one)
-# run this instead of exec'ing the dashboard directly. It (a) waits for the
-# Mode Manager D-Bus service so the dashboard never opens against a dead bus,
-# and (b) is idempotent — if both autostart copies fire, the second one sees
-# the first instance and exits, so we never get two windows.
-set -euo pipefail
+# Both /etc/xdg/autostart and ~/.config/autostart invoke this instead of
+# exec'ing the dashboard directly so that (a) the window opens immediately on
+# login — the Mode Manager's bus probe is best-effort and never blocks the
+# dashboard, its status just populates over the next refresh — and (b) a
+# second invocation (both autostart copies fire) exits instead of stacking a
+# duplicate window.
+set -u
 
 LOGFILE="/tmp/raptor-dashboard.log"
 exec >>"$LOGFILE" 2>&1
@@ -20,17 +21,25 @@ if [ -f "$PIDFILE" ]; then
         exit 0
     fi
 fi
-
-# Ship our pid early so a racing duplicate exits before we even exec.
 echo "$$" > "$PIDFILE"
 
-echo "[$(date -Is)] waiting for org.raptor.ModeManager on the system bus"
-for _ in $(seq 1 45); do
-    if busctl --system --no-pager list 2>/dev/null | grep -q 'org\.raptor\.ModeManager'; then
-        break
-    fi
+# Non-blocking probe (<=3s) so the dashboard opens fast; if the bus just
+# is not up yet the center's own 5s status refresh picks it up.
+for _ in 1 2 3; do
+    busctl --system --no-pager list 2>/dev/null | grep -q 'org\.raptor\.ModeManager' && break
     sleep 1
 done
 
-echo "[$(date -Is)] launching raptor-security-center"
-exec /usr/bin/python3 /usr/lib/raptor-security/raptor_security_center.py "$@"
+launch() { exec /usr/bin/python3 /usr/lib/raptor-security/raptor_security_center.py "$@"; }
+
+# If the center dies within the first few seconds (autostart race, missing
+# display), retry once; otherwise hand off entirely.
+launch "$@" &
+CENTER=$!
+sleep 4
+if ! kill -0 "$CENTER" 2>/dev/null; then
+    echo "[$(date -Is)] first dashboard attempt exited early — relaunching"
+    launch "$@" &
+    CENTER=$!
+fi
+wait "$CENTER"

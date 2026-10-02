@@ -88,12 +88,20 @@ for skel_rc in \
     "build/config/includes.chroot/etc/xdg/autostart/raptor-control-center.desktop" \
     "build/config/includes.chroot/etc/skel/.config/autostart/raptor-control-center.desktop" \
     "build/config/includes.chroot/etc/skel/.config/xfce4/panel/whiskermenu-1.rc" \
-    "build/config/includes.chroot/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"; do
+    "build/config/includes.chroot/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" \
+    "build/config/includes.chroot/usr/local/bin/raptor-debug-dump" \
+    "build/config/includes.chroot/etc/systemd/system/raptor-debug-dump.service"; do
   if [ ! -f "$skel_rc" ]; then
-    echo "  [ERROR] Missing skel/autostart payload: $skel_rc"
+    echo "  [ERROR] Missing skel/autostart/debug payload: $skel_rc"
     ERRORS=$((ERRORS + 1))
   fi
 done
+
+# Debug dump service must be enabled (symlink in multi-user.target.wants)
+if [ ! -e "build/config/includes.chroot/etc/systemd/system/multi-user.target.wants/raptor-debug-dump.service" ]; then
+  echo "  [ERROR] raptor-debug-dump.service not enabled (missing multi-user.target.wants symlink)"
+  ERRORS=$((ERRORS + 1))
+fi
 
 # Check for raptor-security icon
 if [ ! -f "build/config/includes.chroot/usr/share/icons/hicolor/48x48/apps/raptor-security.svg" ]; then

@@ -1,0 +1,46 @@
+#!/bin/sh
+# Runs as root via systemd oneshot (After=multi-user.target) before lightdm.
+# Dumps full diagnostic state to /home/user/raptor-debug.log for the live user.
+
+set -e
+LOGFILE="/home/user/raptor-debug.log"
+exec >"$LOGFILE" 2>&1
+
+echo "=== raptor-debug-dump $(date -Is) ==="
+echo "--- kernel cmdline ---"
+cat /proc/cmdline
+echo
+echo "--- systemd services (raptor*) ---"
+systemctl list-units 'raptor*' --no-legend 2>/dev/null || true
+echo
+echo "--- raptor-copy-skel status ---"
+systemctl status raptor-copy-skel.service --no-pager 2>/dev/null || true
+echo
+echo "--- raptor-mode-manager status ---"
+systemctl status raptor-mode-manager.service --no-pager 2>/dev/null || true
+echo
+echo "--- D-Bus org.raptor.* ---"
+busctl --system --no-pager list 2>/dev/null | grep -i raptor || echo "none"
+echo
+echo "--- /etc/skel payload check ---"
+for f in \
+    /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml \
+    /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml \
+    /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml \
+    /etc/skel/.config/xfce4/panel/whiskermenu-1.rc \
+    /etc/skel/.config/autostart/raptor-control-center.desktop \
+    /etc/skel/.config/autostart/raptor-welcome.desktop; do
+    [ -f "$f" ] && echo "OK  $f" || echo "MISSING $f"
+done
+echo
+echo "--- /home/user actual state ---"
+[ -d /home/user ] && ls -la /home/user/.config/xfce4/xfconf/xfce-perchannel-xml/ 2>/dev/null || echo "no /home/user"
+[ -f /home/user/.config/autostart/raptor-control-center.desktop ] && echo "user autostart OK" || echo "user autostart MISSING"
+echo
+echo "--- dashboard bootstrap log ---"
+[ -f /tmp/raptor-dashboard.log ] && cat /tmp/raptor-dashboard.log || echo "no dashboard log yet"
+echo
+echo "--- xdg system autostart ---"
+ls -la /etc/xdg/autostart/raptor*.desktop 2>/dev/null
+echo
+echo "=== end ==="

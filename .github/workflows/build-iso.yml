@@ -255,6 +255,12 @@ jobs:
       # auto/config is at the repo root (../auto/config) and regenerates
       # config/{bootstrap,chroot,binary,common,source} in build/ via
       # `lb config noauto ...` with the project's canonical option set.
+      - name: Make hooks executable
+        working-directory: build
+        run: |
+          chmod +x config/hooks/*.hook.chroot 2>/dev/null || true
+          chmod +x config/hooks/live/*.hook.chroot 2>/dev/null || true
+
       - name: Configure live-build
         working-directory: build
         run: |
@@ -347,7 +353,7 @@ jobs:
             printf '%s\n' 'insmod search_label'
             printf '%s\n' 'insmod regexp'
             printf '\n'
-            printf '%s\n' 'set default="0"'
+            printf '%s\n' 'set default=0'
             printf '%s\n' 'set timeout=5'
             printf '\n'
             printf '%s\n' 'search --no-floppy --set=root --label RAPTOR-SECURITY'
@@ -357,8 +363,18 @@ jobs:
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
             printf '\n'
+            printf '%s\n' 'menuentry "Raptor Security (Live, hardened)" {'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin ignore_uuid live-media-timeout=30 slab_nomerge page_alloc.shuffle=1 randomize_kstack_offset=on vsyscall=none debugfs=off'
+            printf '%s\n' "    initrd /$INITRD_NAME"
+            printf '%s\n' '}'
+            printf '\n'
+            printf '%s\n' 'menuentry "Raptor Security (Live, nomodeset)" {'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin ignore_uuid live-media-timeout=30 nomodeset'
+            printf '%s\n' "    initrd /$INITRD_NAME"
+            printf '%s\n' '}'
+            printf '\n'
             printf '%s\n' 'menuentry "Raptor Security (Live, fail-safe)" {'
-            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin ignore_uuid live-media-timeout=30 noapic noapm nodma nomce nolapic nosmp'
+            printf '%s\n' '    linux /live/vmlinuz boot=live config components username=user autologin ignore_uuid live-media-timeout=30 nomodeset noapic noapm nodma nomce nolapic nosmp'
             printf '%s\n' "    initrd /$INITRD_NAME"
             printf '%s\n' '}'
           } > efi-build/grub.cfg

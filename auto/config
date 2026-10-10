@@ -32,4 +32,6 @@ lb config noauto "${@}" \
     --apt-indices false \
     --apt-recommends true \
     --cache-stages "" \
-    --bootappend-live "boot=live config components username=user autologin ignore_uuid live-media-timeout=30"
+    --bootappend-live "boot=live config components username=user autologin ignore_uuid live-media-timeout=30" \
+    --bootappend-live-failsafe "boot=live config components username=user autologin ignore_uuid live-media-timeout=30 nomodeset noapic noapm nodma nomce nolapic nosmp" \
+    --chroot-squashfs-compression-type zstd

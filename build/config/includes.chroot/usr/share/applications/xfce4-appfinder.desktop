@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Application Finder
+Comment=Find and run applications
+Exec=xfce4-appfinder
+Icon=xfce4-appfinder
+NoDisplay=true

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NetExec
+Comment=Network service exploitation toolkit
+Exec=netexec
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-NetAnalysis;

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DNSEnum
+Comment=DNS enumeration tool
+Exec=dnsenum
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

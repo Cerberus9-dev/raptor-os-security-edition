@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Guymager
+Comment=Forensic disk imager
+Exec=guymager
+Icon=guymager
+Terminal=false
+Categories=System;Security;X-Raptor-Forensics;

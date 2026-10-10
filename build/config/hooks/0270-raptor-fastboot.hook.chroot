@@ -1,0 +1,42 @@
+#!/bin/sh
+# 0270-raptor-fastboot.hook.chroot
+#
+# Faster boot / less idle CPU for the live session: mask services that add
+# tens of milliseconds-to-seconds of boot and idle wakeups but are useless on
+# a booted-live privesec desktop. Masked units never even load — faster boot
+# AND fewer moving parts to attack. Nothing here is required by the desktop,
+# Tor, NetworkManager (which spawns its own wpa_supplicant), or the Raptor
+# daemons.
+
+echo "[raptor-security] masking non-essential daemons for faster live boot"
+
+for unit in \
+    bluetooth.service \
+    bluetooth-mesh.service \
+    ModemManager.service \
+    avahi-daemon.service \
+    avahi-daemon.socket \
+    cups.service \
+    cups.socket \
+    cups-browsed.service \
+    packagekit.service \
+    packagekit-offline-update.service \
+    smartd.service \
+    fwupd.service \
+    pppd-dns.service \
+    rsync.service \
+    remote-fs.target \
+    getty@tty2.service \
+    getty@tty3.service \
+    getty@tty4.service \
+    getty@tty5.service \
+    getty@tty6.service
+do
+    systemctl mask "$unit" 2>/dev/null || true
+done
+
+# Keep journald memory-only: live session state should not hit the USB key
+# (writes wear media and leave trace), and it speeds up shutdown.
+sed -i 's/^#*Storage=.*/Storage=volatile/' /etc/systemd/journald.conf 2>/dev/null || true
+
+exit 0

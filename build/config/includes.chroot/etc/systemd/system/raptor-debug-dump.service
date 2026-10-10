@@ -1,0 +1,15 @@
+[Unit]
+Description=Dump Raptor diagnostic state for live user
+Before=lightdm.service display-manager.service
+After=multi-user.target systemd-user-sessions.service
+ConditionPathExists=/home/user
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/raptor-debug-dump
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

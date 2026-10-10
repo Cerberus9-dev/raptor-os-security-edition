@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Enable anti-forensics RAM wipe on shutdown
+systemctl enable raptor-sdmem.service
+
+# Group that D-Bus policy grants state-changing access to (SetMode, etc.)
+getent group raptor-admin >/dev/null 2>&1 || groupadd -r raptor-admin
+
+# Apply the default nftables policy at boot so the live session is firewalled
+# from the very start (DHCP/mDNS are explicitly allowed by the ruleset).
+systemctl enable nftables.service
+
+# Kodachi-style ejection watchdog: powers off the machine the moment the
+# live USB the session booted from is physically removed.
+systemctl enable raptor-media-watchdog.service
+
+# Enable the Raptor Security D-Bus daemons the dashboard talks to
+for unit in \
+  raptor-mode-manager.service \
+  raptor-tor-manager.service \
+  raptor-vpn-manager.service \
+  raptor-network-protection-manager.service \
+  raptor-persistence-manager.service \
+  raptor-emergency-shutdown.service \
+  raptor-firstboot.service \
+  raptor-copy-skel.service
+do
+  systemctl enable "$unit" 2>/dev/null || true
+done
+
+# Set default permissions for Raptor executables
+chmod 755 /usr/local/bin/raptor-* 2>/dev/null || true
+
+# Set strict permissions on Polkit rule file
+if [ -f /etc/polkit-1/rules.d/50-raptor-mode-manager.rules ]; then
+  chown root:root /etc/polkit-1/rules.d/50-raptor-mode-manager.rules
+  chmod 644 /etc/polkit-1/rules.d/50-raptor-mode-manager.rules
+fi
+
+# Ensure LightDM autologin directory exists
+mkdir -p /etc/lightdm/lightdm.conf.d

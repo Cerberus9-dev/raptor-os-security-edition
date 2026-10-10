@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Raptor Security Center
+Comment=System, network, privacy, and security mode dashboard
+Exec=raptor-security-center
+Icon=security-high
+Terminal=false
+Categories=System;Security;

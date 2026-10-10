@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tcpdump
+Comment=Command-line packet analyzer
+Exec=tcpdump
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-NetAnalysis;

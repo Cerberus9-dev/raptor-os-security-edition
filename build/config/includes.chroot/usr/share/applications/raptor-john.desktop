@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=John the Ripper
+Comment=Password cracking suite
+Exec=john
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Passwords;

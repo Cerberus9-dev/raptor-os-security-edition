@@ -1,0 +1,15 @@
+[Unit]
+Description=Raptor Security VPN Manager
+Documentation=https://github.com/Cerberus9-dev/Raptor-OS-Security-Edition
+After=dbus.service NetworkManager.service
+Requires=NetworkManager.service
+
+[Service]
+Type=dbus
+BusName=org.raptor.VPNManager
+ExecStart=/usr/bin/python3 /usr/lib/raptor-security/raptor_vpn_managerd.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

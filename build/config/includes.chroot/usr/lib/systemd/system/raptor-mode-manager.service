@@ -1,0 +1,27 @@
+[Unit]
+Description=Raptor Security Mode Manager
+Documentation=https://github.com/Cerberus9-dev/Raptor-OS-Security-Edition
+# The base firewall (nftables.service) runs `nft -f /etc/nftables.conf`
+# which does `flush ruleset`; the daemon must load its own {mode}.nft
+# AFTER that or the boot ruleset wipes it. (Mode toggles never touch
+# nftables.service — see the mode .services files.)
+After=network-pre.target dbus.service nftables.service
+Before=network.target
+Wants=network-pre.target
+
+[Service]
+Type=dbus
+BusName=org.raptor.ModeManager
+ExecStart=/usr/bin/python3 /usr/lib/raptor-security/raptor_mode_managerd.py
+Restart=on-failure
+RestartSec=2
+
+# This daemon legitimately needs root (nft/sysctl/systemctl) — no
+# CapabilityBoundingSet trimming or ProtectSystem=strict here, since it
+# writes to /etc/raptor-security/current-mode and shells out to system
+# tools that themselves need full privilege. Section 8/9's "hardening"
+# is about what Mode Manager configures on the SYSTEM, not sandboxing
+# Mode Manager itself into uselessness.
+
+[Install]
+WantedBy=multi-user.target

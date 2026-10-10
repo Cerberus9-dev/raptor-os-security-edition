@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Nikto
+Comment=Web server scanner
+Exec=nikto
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

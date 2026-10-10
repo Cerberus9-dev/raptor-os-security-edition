@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wfuzz
+Comment=Web application fuzzer
+Exec=wfuzz
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

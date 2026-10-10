@@ -1,0 +1,13 @@
+[Unit]
+Description=Raptor OS Emergency Background RAM Wipe
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sdmem -f -ll
+Nice=19
+IOSchedulingClass=idle
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

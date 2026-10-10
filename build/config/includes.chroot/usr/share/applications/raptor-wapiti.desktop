@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wapiti
+Comment=Web application vulnerability scanner
+Exec=wapiti
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

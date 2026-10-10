@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Update desktop database to register all .desktop files from Raptor Security
+# This ensures applications appear in the application menu/finder
+echo "[0220] Updating desktop database..."
+update-desktop-database /usr/share/applications 2>/dev/null || true
+update-desktop-database /usr/local/share/applications 2>/dev/null || true
+
+# Update MIME database as well for any custom MIME types
+echo "[0220] Updating MIME database..."
+update-mime-database /usr/share/mime 2>/dev/null || true
+
+echo "[0220] Desktop and MIME databases updated"

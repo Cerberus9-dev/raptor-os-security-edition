@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Dmitry
+Comment=Deepmagic Information Gathering Tool
+Exec=dmitry
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

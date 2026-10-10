@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Nyx
+Comment=Tor relay monitor (terminal UI)
+Exec=nyx
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Tor;

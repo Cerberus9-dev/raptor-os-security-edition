@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Netdiscover
+Comment=Passive/active ARP reconnaissance
+Exec=netdiscover
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

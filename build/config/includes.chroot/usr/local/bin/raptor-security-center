@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Launcher for the Raptor Security Center (GTK4 dashboard).
+# Runs the core security dashboard. Requires an active graphical session.
+exec /usr/bin/python3 /usr/lib/raptor-security/raptor_security_center.py "$@"

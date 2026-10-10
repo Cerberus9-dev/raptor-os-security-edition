@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Raptor OS — anonymity controls. All Tor state goes through the Tor
+# Manager daemon (single owner); the firewall is restored by re-applying
+# the current mode afterwards via the Mode Manager.
+set -euo pipefail
+
+HELPER="/usr/lib/raptor-security/raptor-dbus-helper.py"
+CONF_DIR="/etc/raptor"
+mkdir -p "$CONF_DIR"
+
+ACTION="${1:-status}"
+
+toggle_dnscrypt() {
+    if systemctl is-active --quiet stubby; then
+        systemctl stop stubby
+        echo "DISABLED" > "${CONF_DIR}/dnscrypt_status"
+    else
+        systemctl start stubby
+        echo "ENABLED" > "${CONF_DIR}/dnscrypt_status"
+    fi
+}
+
+case "$ACTION" in
+    tor-on)
+        "$HELPER" TorManager Start
+        echo "Tor started."
+        ;;
+    tor-off)
+        "$HELPER" TorManager Stop
+        # Re-apply the current mode so the firewall reflects it again.
+        MODE=$("$HELPER" ModeManager GetMode) || MODE="secure"
+        case "$MODE" in secure|hardened|lockdown) ;; *) MODE="secure" ;; esac
+        "$HELPER" ModeManager SetMode "$MODE"
+        echo "Tor stopped; ${MODE^^} mode re-applied."
+        ;;
+    new-identity)
+        "$HELPER" TorManager NewIdentity
+        echo "New identity requested (affects only new connections)."
+        ;;
+    dnscrypt-toggle)
+        toggle_dnscrypt
+        ;;
+    status)
+        TOR=$("$HELPER" TorManager GetStatus 2>/dev/null || echo '{}')
+        DNS=$(cat "${CONF_DIR}/dnscrypt_status" 2>/dev/null || echo "DISABLED")
+        VPN=$(nmcli connection show --active 2>/dev/null | awk '{print $1}' | wc -l)
+        TOR="$TOR" DNS="$DNS" VPN="$VPN" python3 - <<'PY'
+import json
+import os
+
+tor = {}
+try:
+    tor = json.loads(os.environ["TOR"])
+except Exception:
+    pass
+
+print(json.dumps({
+    "tor_service": "active" if tor.get("service_active") else "inactive",
+    "tor_socks": "listening" if tor.get("socks_listening") else "off",
+    "dnscrypt": os.environ["DNS"],
+    "vpn_connections": int(os.environ["VPN"] or "0"),
+}))
+PY
+        ;;
+    *)
+        echo "Usage: $0 {tor-on|tor-off|new-identity|dnscrypt-toggle|status}" >&2
+        exit 1
+        ;;
+esac

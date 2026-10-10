@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+# Early chroot hook (config/hooks/*.chroot_early runs right after the apt
+# archive sources are installed and BEFORE the package-list install pass).
+#
+# The LibreWolf apt repo key must be in place before `apt-get install`
+# resolves packages, otherwise the very first update against
+# repo.librewolf.net fails signature verification and the whole build
+# aborts. The base debootstrap chroot also has no CA trust store yet, so
+# fetch tools + ca-certificates are installed from the (plain http)
+# Debian mirrors first, then the key is fetched over https.
+#
+# Note: repo.librewolf.net/keyring.gpg is ALREADY a binary OpenPGP
+# keyring, so it must not be unconditionally dearmored (gpg --dearmor
+# only accepts ASCII-armored input).
+
+mkdir -p /usr/share/keyrings
+
+# Temporarily hide the LibreWolf apt entry so apt-get update works before
+# its key is installed; restore it right after the key is in place.
+if [ -e /etc/apt/sources.list.d/librewolf.list ]
+then
+	mv /etc/apt/sources.list.d/librewolf.list /etc/apt/sources.list.d/.librewolf.list.early
+fi
+
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates wget gpg
+
+wget -O- https://repo.librewolf.net/keyring.gpg > /tmp/librewolf-keyring.gpg
+if grep -q -- '-----BEGIN PGP' /tmp/librewolf-keyring.gpg
+then
+	gpg --dearmor -o /usr/share/keyrings/librewolf-archive-keyring.gpg /tmp/librewolf-keyring.gpg
+else
+	cp /tmp/librewolf-keyring.gpg /usr/share/keyrings/librewolf-archive-keyring.gpg
+fi
+rm -f /tmp/librewolf-keyring.gpg
+
+if [ -e /etc/apt/sources.list.d/.librewolf.list.early ]
+then
+	mv /etc/apt/sources.list.d/.librewolf.list.early /etc/apt/sources.list.d/librewolf.list
+fi
+
+apt-get update

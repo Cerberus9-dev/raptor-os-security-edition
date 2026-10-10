@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Medusa
+Comment=Parallel network login auditor
+Exec=medusa
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Passwords;

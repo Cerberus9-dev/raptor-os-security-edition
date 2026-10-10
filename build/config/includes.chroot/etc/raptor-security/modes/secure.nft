@@ -1,0 +1,21 @@
+flush ruleset
+
+table inet raptor_security {
+    chain input {
+        type filter hook input priority filter; policy drop;
+        iifname "lo" accept
+        ct state established,related accept
+        udp dport 67-68 accept
+        udp dport 546-547 accept
+        udp dport 5353 accept
+        meta l4proto icmp accept
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

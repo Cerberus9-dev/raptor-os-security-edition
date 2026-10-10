@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bettercap
+Comment=Swiss army knife for network attacks
+Exec=bettercap
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

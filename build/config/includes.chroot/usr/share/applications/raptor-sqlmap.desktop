@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SQLMap
+Comment=Automatic SQL injection tool
+Exec=sqlmap
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

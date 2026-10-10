@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Crunch
+Comment=Wordlist generator
+Exec=crunch
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Passwords;

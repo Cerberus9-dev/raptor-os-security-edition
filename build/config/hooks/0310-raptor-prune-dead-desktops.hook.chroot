@@ -1,0 +1,62 @@
+#!/bin/sh
+# 0310-raptor-prune-dead-desktops.hook.chroot
+#
+# Removes Raptor .desktop entries whose Exec target does not exist on PATH.
+# Runs after 0300-raptor-thirdparty-tools so tools that genuinely failed to
+# build/install drop out of the menu instead of showing dead entries that do
+# nothing when clicked (one of the "no usable app menu" complaints).
+
+echo "[raptor-security] pruning .desktop entries with missing Exec targets"
+
+DESKTOP_DIR="/usr/share/applications"
+PRUNED=0
+KEPT=0
+
+for file in "${DESKTOP_DIR}"/raptor-*.desktop; do
+    [ -f "$file" ] || continue
+
+    exec_line="$(grep -m1 '^Exec=' "$file" 2>/dev/null || true)"
+    [ -n "$exec_line" ] || {
+        KEPT=$((KEPT + 1))
+        continue
+    }
+
+    command_str="${exec_line#Exec=}"
+    [ -n "$command_str" ] || continue
+
+    case "$command_str" in
+        *' '*)
+            command_str="${command_str%% *}"
+            ;;
+    esac
+
+    # Only analyze plain binary names or paths; anything with shell/word
+    # syntax (quotes, env-prefix, $, wildcards, ...) is kept untouched.
+    if ! printf '%s' "$command_str" | grep -qE '^[A-Za-z0-9/._+-]+$'; then
+        KEPT=$((KEPT + 1))
+        continue
+    fi
+
+    if [ "${command_str#/}" != "${command_str}" ]; then
+        # Absolute path — must exist and be executable
+        if [ -x "$command_str" ]; then
+            KEPT=$((KEPT + 1))
+        else
+            rm -f "$file"
+            echo "  pruned $file (missing: $command_str)"
+            PRUNED=$((PRUNED + 1))
+        fi
+    else
+        if command -v "$command_str" >/dev/null 2>&1; then
+            KEPT=$((KEPT + 1))
+        else
+            rm -f "$file"
+            echo "  pruned $file (not on PATH: $command_str)"
+            PRUNED=$((PRUNED + 1))
+        fi
+    fi
+done
+
+echo "[raptor-security] desktop prune pass complete: pruned=$PRUNED kept=$KEPT"
+
+exit 0

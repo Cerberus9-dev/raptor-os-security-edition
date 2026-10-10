@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Raptor OS — switch the security mode via the Mode Manager daemon.
+# The daemon is the single owner of firewall/sysctl/service state; this
+# CLI just talks to it over D-Bus (see raptor-dbus-helper.py).
+set -euo pipefail
+
+HELPER="/usr/lib/raptor-security/raptor-dbus-helper.py"
+MODE="${1:-status}"
+
+case "$MODE" in
+    secure|hardened|lockdown)
+        "$HELPER" ModeManager SetMode "$MODE"
+        echo "Raptor Security Mode switched to: ${MODE^^}"
+        ;;
+    security)
+        # Backwards-compatible alias (older scripts used "security").
+        "$HELPER" ModeManager SetMode secure
+        echo "Raptor Security Mode switched to: SECURE"
+        ;;
+    status)
+        CURRENT=$("$HELPER" ModeManager GetMode)
+        echo "Current Raptor Security Mode: ${CURRENT^^}"
+        ;;
+    *)
+        echo "Usage: $0 {secure|hardened|lockdown|status}" >&2
+        exit 1
+        ;;
+esac

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ARP Scan
+Comment=Discover hosts using ARP
+Exec=arp-scan
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

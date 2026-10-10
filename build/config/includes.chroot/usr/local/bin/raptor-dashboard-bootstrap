@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# raptor-dashboard-bootstrap — robust, automatic Security Center autostart.
+#
+# Both /etc/xdg/autostart and ~/.config/autostart invoke this instead of
+# exec'ing the dashboard directly so that (a) the window opens immediately on
+# login — the Mode Manager's bus probe is best-effort and never blocks the
+# dashboard, its status just populates over the next refresh — and (b) a
+# second invocation (both autostart copies fire) exits instead of stacking a
+# duplicate window.
+set -u
+
+LOGFILE="/tmp/raptor-dashboard.log"
+exec >>"$LOGFILE" 2>&1
+echo "[$(date -Is)] raptor-dashboard-bootstrap: session start (DISPLAY=${DISPLAY:-<none>})"
+
+PIDFILE="/tmp/raptor-dashboard.pid"
+if [ -f "$PIDFILE" ]; then
+    OLD_PID="$(cat "$PIDFILE" 2>/dev/null || echo '')"
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "[$(date -Is)] dashboard already running (pid $OLD_PID) — exiting"
+        exit 0
+    fi
+fi
+echo "$$" > "$PIDFILE"
+
+# Non-blocking probe (<=3s) so the dashboard opens fast; if the bus just
+# is not up yet the center's own 5s status refresh picks it up.
+for _ in 1 2 3; do
+    busctl --system --no-pager list 2>/dev/null | grep -q 'org\.raptor\.ModeManager' && break
+    sleep 1
+done
+
+launch() { exec /usr/bin/python3 /usr/lib/raptor-security/raptor_security_center.py "$@"; }
+
+# If the center dies within the first few seconds (autostart race, missing
+# display), retry once; otherwise hand off entirely.
+launch "$@" &
+CENTER=$!
+sleep 4
+if ! kill -0 "$CENTER" 2>/dev/null; then
+    echo "[$(date -Is)] first dashboard attempt exited early — relaunching"
+    launch "$@" &
+    CENTER=$!
+fi
+wait "$CENTER"

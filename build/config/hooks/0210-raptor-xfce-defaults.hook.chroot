@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install Raptor's XFCE defaults SYSTEM-WIDE (XDG_CONFIG_DIRS=/etc/xdg).
+# This runs as a *.hook.chroot — i.e. AFTER packages are installed — so it
+# overwrites the panel/xsettings/desktop defaults shipped by Debian's
+# xfce4-panel package. That way the themed dark desktop is guaranteed on
+# first login regardless of whether live-config copies /etc/skel into the
+# live user's home (which, if it fails, leaves an unconfigured blue desktop
+# with no panel — the exact symptom we hit).
+XDG_XFCONF=/etc/xdg/xfce4/xfconf/xfce-perchannel-xml
+DEFAULTS=/usr/lib/raptor-security/xfce-defaults
+
+mkdir -p "$XDG_XFCONF"
+for f in xsettings.xml xfce4-desktop.xml xfce4-panel.xml; do
+    install -m 0644 "$DEFAULTS/$f" "$XDG_XFCONF/$f"
+done
+echo "[0210] installed Raptor XFCE defaults into $XDG_XFCONF"
+
+# Greeter config: the lightdm-gtk-greeter package owns /etc/lightdm/
+# lightdm-gtk-greeter.conf on install, so write the final themed version
+# here (after package installation) instead of shipping it via includes.
+cat > /etc/lightdm/lightdm-gtk-greeter.conf <<'EOF'
+[greeter]
+theme-name=Greybird-dark
+icon-theme-name=Papirus-Dark
+background=/usr/share/backgrounds/raptor-dark.png
+background-color=#141414
+# Keep the greeter minimal — no theme-selection clutter on a live security OS.
+indicators=~host;~spacer
+EOF
+echo "[0210] wrote themed lightdm-gtk-greeter.conf"

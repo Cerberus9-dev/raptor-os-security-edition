@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Raptor OS — status report pulled from the Mode Manager daemon's live
+# checks (never from stale local state files, so indicators cannot lie).
+set -euo pipefail
+
+HELPER="/usr/lib/raptor-security/raptor-dbus-helper.py"
+
+STATUS=$("$HELPER" ModeManager GetStatus)
+MODE=$("$HELPER" ModeManager GetMode)
+RAMWIPE=$(systemctl is-active raptor-ramwipe-now.service 2>/dev/null || true)
+
+STATUS="$STATUS" MODE="$MODE" RAMWIPE="$RAMWIPE" python3 - <<'PY'
+import json
+import os
+
+status = json.loads(os.environ["STATUS"])
+mode = os.environ["MODE"]
+ramwipe = os.environ["RAMWIPE"].strip() or "inactive"
+killswitch = status.get("kill_switch_armed")
+
+print(json.dumps({
+    "mode": mode.upper(),
+    "killswitch": killswitch if killswitch in ("armed", "unknown") else "inactive",
+    "firewall": status.get("firewall_active"),
+    "ramwipe": ramwipe,
+    "tor": status.get("tor_state"),
+    "vpn": status.get("vpn_state"),
+    "mac": status.get("mac_randomization"),
+    "persistence": status.get("persistence"),
+    "interfaces": status.get("interfaces"),
+}, indent=2))
+PY

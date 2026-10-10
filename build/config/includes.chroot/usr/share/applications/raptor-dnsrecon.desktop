@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DNSRecon
+Comment=DNS enumeration and recon
+Exec=dnsrecon
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Recon;

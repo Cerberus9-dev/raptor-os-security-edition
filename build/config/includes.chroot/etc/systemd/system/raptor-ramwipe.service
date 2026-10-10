@@ -1,0 +1,11 @@
+[Unit]
+Description=Raptor OS Cold-Boot Protection & RAM Wipe
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sdmem -f -ll
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target

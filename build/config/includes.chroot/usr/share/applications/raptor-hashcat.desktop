@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Hashcat
+Comment=Advanced password recovery
+Exec=hashcat
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Passwords;

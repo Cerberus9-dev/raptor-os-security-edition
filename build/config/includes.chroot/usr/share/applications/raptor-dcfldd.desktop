@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=dcfldd
+Comment=Enhanced dd for forensics
+Exec=dcfldd
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Forensics;

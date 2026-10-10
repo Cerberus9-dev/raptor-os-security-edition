@@ -1,0 +1,48 @@
+#!/bin/sh
+# Raptor OS Security Edition — Kodachi-style ejection watchdog.
+#
+# Watches the live medium that this session booted from. The moment the
+# USB stick is physically removed from the system, the machine powers
+# itself off (a graceful shutdown so the existing RAM-wipe services run
+# first — the session dies with the stick, Kodachi-style).
+#
+# The medium is identified not by a mount path but by the block device it
+# lives on: live-boot keeps the ISO partition mounted at /run/live/medium,
+# but the mount can go stale (or vanish) before the hardware is gone, and
+# if the image were ever booted with `toram` the mount is released while
+# the device is still present. Watching the whole parent disk (sdb for
+# sdb1) captures both cases.
+
+set -u
+
+MEDIUM=$(awk '$2 == "/run/live/medium" { print $1; exit }' /proc/mounts)
+[ -n "$MEDIUM" ] || exit 0
+
+case "$MEDIUM" in
+	/dev/*) ;;
+	*) exit 0 ;;
+esac
+
+# Give udev a moment to materialize the node, then walk up to the whole
+# disk (sdb1 -> sdb). Observing the parent disk means an unplugged
+# partition can never look like a removal-only-hidden-nothing case.
+i=0
+while [ ! -e "$MEDIUM" ] && [ "$i" -lt 30 ]; do
+	sleep 1
+	i=$((i + 1))
+done
+[ -e "$MEDIUM" ] || exit 0
+
+if command -v lsblk >/dev/null 2>&1; then
+	PARENT=$(lsblk -no PKNAME "$MEDIUM" 2>/dev/null)
+	[ -n "$PARENT" ] && MEDIUM="/dev/$PARENT"
+fi
+
+logger -t raptor-media-watchdog "watching live medium $MEDIUM"
+
+while [ -e "$MEDIUM" ]; do
+	sleep 2
+done
+
+logger -t raptor-media-watchdog "live medium $MEDIUM was removed - powering off"
+systemctl --no-block poweroff

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DirB
+Comment=Web content scanner
+Exec=dirb
+Icon=utilities-terminal
+Terminal=true
+Categories=System;Security;X-Raptor-Web;

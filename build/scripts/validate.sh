@@ -150,6 +150,14 @@ if ! grep -qx 'live-boot' "$LIST" 2>/dev/null; then
   ERRORS=$((ERRORS + 1))
 fi
 
+# Right-click create/extract archives in Thunar needs the plugin AND a handler.
+for pkg in thunar-archive-plugin xarchiver zip unzip; do
+  if ! grep -qx "$pkg" "$LIST" 2>/dev/null; then
+    echo "  [ERROR] $LIST does not pin $pkg (Thunar archive context menu would be missing)"
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
 if [ "$ERRORS" -gt 0 ]; then
   echo "[FAIL] Validation failed with $ERRORS error(s)."
   exit 1

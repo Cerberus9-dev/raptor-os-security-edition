@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-for u in NetworkManager-wait-online.service systemd-networkd-wait-online.service \
-         apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_all.timer \
-         apt-daily.service apt-daily-upgrade.service; do
-    systemctl mask "$u" || true
-done

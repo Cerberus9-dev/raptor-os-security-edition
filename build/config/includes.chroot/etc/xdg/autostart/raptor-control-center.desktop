@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Raptor Security Center
-Comment=Raptor security posture, system, and network dashboard
-Exec=/usr/local/bin/raptor-dashboard-bootstrap
-Icon=security-high
-Terminal=false
-Categories=System;Security;
-OnlyShowIn=XFCE;

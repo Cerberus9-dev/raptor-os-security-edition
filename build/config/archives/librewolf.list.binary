@@ -1,4 +1,0 @@
-# LibreWolf moved its repo: deb.librewolf.net (per-distro suites) was
-# replaced by repo.librewolf.net with a single "librewolf" suite for all
-# Debian-based distros. See https://librewolf.net/debian-migration/.
-deb [arch=amd64 signed-by=/usr/share/keyrings/librewolf-archive-keyring.gpg] https://repo.librewolf.net librewolf main

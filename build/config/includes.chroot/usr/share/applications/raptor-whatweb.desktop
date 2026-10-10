@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=WhatWeb
-Comment=Website fingerprinting tool
-Exec=whatweb
-Icon=utilities-terminal
-Terminal=true
-Categories=System;Security;X-Raptor-Web;

@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Wifite
-Comment=Automated wireless attack tool
-Exec=wifite
-Icon=utilities-terminal
-Terminal=true
-Categories=System;Security;X-Raptor-Recon;

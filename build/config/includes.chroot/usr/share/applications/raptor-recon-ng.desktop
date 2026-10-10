@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Recon-ng
-Comment=Full-featured reconnaissance framework
-Exec=recon-ng
-Icon=utilities-terminal
-Terminal=true
-Categories=System;Security;X-Raptor-Recon;

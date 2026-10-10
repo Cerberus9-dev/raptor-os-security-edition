@@ -1,9 +1,9 @@
-# Raptor OS — Security Edition
-**Current version: v0.1.0 (pre-release)**
+# Raptor OS
+**Current version: v2.6.9**
 
-A Debian 12 (Bookworm) based privacy-focused **penetration testing + advanced cybersec live OS**, built in the spirit of Kodachi. Routed anonymity, encrypted DNS, a strict nftables firewall, and dynamic operational profiles all driven from a GTK4/libadwaita Kodachi-style Security Center dashboard — lean toolset, no bloat.
+A custom Bazzite-based Linux distribution built for gaming — automatic GPU optimisation, low-latency audio, a green accent theme with Windows-style window management, and a zero-terminal firstboot experience.
 
-> **Heavy W.I.P — Feedback appreciated!** This is a **live** OS — boot it from a USB stick, nothing gets installed. By default every session is amnesic: RAM is wiped at shutdown and no data is written to the host drive. Optional encrypted persistence for configs and tool data.
+> **Heavy W.I.P — Feedback appreciated!** This is **not** a live OS. It needs its own drive, replaces your current OS, or runs alongside it as a dual boot. Minimum 40–50 GB free for dual boot. Can be tested in a VM first.
 
 ---
 
@@ -11,40 +11,45 @@ A Debian 12 (Bookworm) based privacy-focused **penetration testing + advanced cy
 
 | | Minimum | Recommended |
 |---|---|---|
-| **CPU** | 64-bit x86_64, 1.6 GHz+ dual-core | Modern Intel/AMD multi-core |
-| **RAM** | 4 GB (2 GB free after boot) | 8 GB+ for large scans + browser tabs |
-| **Storage** | 4 GB USB stick (live) / 16 GB for encrypted persistence | 8 GB+ fast USB 3.0 stick |
-| **GPU** | Any GPU with a Linux driver (basic 2D is all a live OS needs) | Anything with working open drivers (AMD/Intel best) |
-| **Network** | Wired NIC for testing; wireless requires a chipset with monitor mode (see below) | USB adapter known-good with aircrack-ng |
-| **Boot** | UEFI or BIOS with USB boot | UEFI with Secure Boot disabled |
+| **CPU** | 64-bit x86_64, 2 GHz+ quad-core | Recent AMD or Intel processor suited for Linux gaming |
+| **RAM** | 8 GB | 16 GB or more for larger games and multitasking |
+| **Storage** | ~20 GB (bare-basics default image — no optional apps chosen), SSD required | 50 GB+ if you add creative/dev tools from the optional picker; more for a real Steam library |
+| **GPU** | Any GPU supporting Vulkan 1.3+ | AMD or Intel Arc (best-supported); NVIDIA works, with some documented caveats |
+| **Boot** | UEFI required, disk must be GPT | — |
 
 ---
 
 ## Installation
 
-The ISO is built automatically by GitHub Actions from `main` and published on **Internet Archive** (like Raptor OS Home Edition — ISOs are too large for GitHub Releases). Download the latest Security Edition ISO from the Raptor OS collection on [Internet Archive](https://archive.org/), then flash it to a USB stick:
+Download the latest Raptor OS Home Edition ISO from Internet Archive [Internet Archive](https://archive.org/details/raptor-os_202605), then flash it to a USB drive:
 
-- **[Rufus](https://rufus.ie/en/)** — select **DD image mode** (not ISO copy mode)
-- **[Ventoy](https://www.ventoy.net)** — copy the ISO to a Ventoy USB, boot and select it
-- **[balenaEtcher](https://etcher.balena.io/)** — select the ISO and the stick, flash
+- **[Rufus](https://rufus.ie/en/)** — select **DD image mode** + **GPT** partition scheme
+- **[Ventoy](https://www.ventoy.net)** — copy ISO to Ventoy USB, boot and select it
+- **[Fedora Media Writer](https://github.com/FedoraQt/MediaWriter)** — most reliable, always works
 
-Then boot your machine **from the USB**. Raptor OS runs entirely in RAM; nothing is installed to your hard drive and — with no persistence volume — no trace of the session survives a reboot (RAM is wiped on shutdown by `sdmem`).
+### Rebase from Bazzite (no reinstall)
 
-### Optional: Encrypted Persistence
+```bash
+# Step 1 — unverified image to start the transition
+rpm-ostree rebase ostree-unverified-registry:ghcr.io/cerberus9-dev/raptor-os:latest
+systemctl reboot
 
-At boot, press <kbd>Tab</kbd> on the boot entry and append `persistence` to enable the optional encrypted persistence volume for `/home`:
+# Step 2 — switch to the signed image
+rpm-ostree rebase ostree-image-signed:docker://ghcr.io/cerberus9-dev/raptor-os:latest
+systemctl reboot
+```
 
-- Create an LUKS volume labelled `raptor-home` (e.g. with **Disks** / `cryptsetup luksFormat`)
-- On boot it unlocks, mounts `/home`, and the session is no longer fully amnesic — swap deactivation is offered on shutdown so you control what (if anything) leaks to disk
+> **Already on Raptor OS?** Open **Raptor Update Manager** → **Update & Reboot**. Handles system image + Flatpak updates in one click. The app launcher automatically rebuilds its category index after updates so blank folders never appear.
 
 ---
 
 ## First Boot
 
-1. Automatic login to the `user` account launches **Raptor Security Center** as the dashboard.
-2. The **first-boot service** wires the live user into `raptor-admin` (required for mode switches) and initialises `/etc/raptor-security`.
-3. **Stubby** (DNS-over-TLS) is active out of the box on `dnsstub0`; **Tor** is pre-configured for LibreWolf via SOCKS5 `127.0.0.1:9050`.
-4. The dashboard shows your current mode and live **System**, **Network**, and **Security** state — CPU, RAM, disk, uptime, interfaces, DNS servers, and your public IP *as seen through Tor* (never the clearnet IP).
+Three dialogs appear on the first login, in sequence:
+
+1. **Browser choice** — no browser ships in the image; Raptor keeps the default *minimal*. Choose Firefox, Brave, Chromium, Chrome, or Edge (each a one-time ~100–150 MB Flathub download, Firefox pre-selected). Shows a network check, download progress bar, and retry prompt on failure. "Skip — No Browser" installs nothing and forces no default.
+2. **Chat client choice** — Discord (~150 MB) or Vesktop (~100 MB, Vencord built in). Neither is pre-installed. "Skip — Install Neither" is always available.
+3. **App picker** — 90+ optional apps across 20 categories, including the GOverlay MangoHud config GUI, game-streaming stack (Moonlight + Sunshine), extra emulators, JetBrains IDEs, and VS Code. Nothing is pre-ticked. Everything here is also installable later from Discover or `flatpak install flathub <id>`. "Skip — Install Nothing" is always available.
 
 ---
 
@@ -52,59 +57,125 @@ At boot, press <kbd>Tab</kbd> on the boot entry and append `persistence` to enab
 
 ### Pre-installed (always present)
 
-| Category | Packages |
+| Category | Apps |
 |---|---|
-| **Desktop** | XFCE, LightDM autologin, htop |
-| **Anonymity** | Tor + torsocks, LibreWolf with SOCKS5 proxy (third-party build hook), Stubby DNS-over-TLS, macchanger |
-| **Firewall & Modes** | nftables with 3 bundled profiles (Secure / Hardened / Lockdown), iptables, rfkill killswitch |
-| **Anti-Forensics** | secure-delete (`sdmem` RAM wipe at shutdown), BleachBit, MAT2 |
-| **Encryption** | cryptsetup + Disks (LUKS persistence), KeePassXC |
-| **VPN** | OpenVPN, WireGuard tools |
-| **Sandboxing** | Firejail |
-
-### Penetration Testing Toolset
-
-| Category | Tools |
-|---|---|
-| **Recon & Scanning** | nmap, masscan, netdiscover, arp-scan, dnsrecon, dnsenum, recon-ng, bettercap, whois, traceroute, onesixtyone, smbclient, impacket |
-| **Traffic & Pivoting** | tcpdump, wireshark + tshark, netcat, socat, proxychains4, dsniff |
-| **Web App Security** | nikto, gobuster, wfuzz, ffuf, dirb, sqlmap, wapiti |
-| **Password Auditing** | john, hashcat, hydra, medusa |
-| **Wireless** | aircrack-ng, wifite (chipset must support monitor mode) |
-| **Forensics & Stego** | binwalk, foremost, steghide, exiftool, testdisk, sleuthkit |
-| **Cracking/Exploit Runtimes** | yara, ncat, whois, python3-impacket, librewolf dev tools |
-
-> Tools not packaged in Debian — **Burp Suite**, **Metasploit Framework**, **WPScan**, **NetExec**, **radare2**, **theHarvester** — are installed best-effort at build time by the `0300 raptor thirdparty tools` hook, when the build environment allows.
+| **Gaming** | Heroic Games Launcher (Epic/GOG/Amazon), ProtonUp-Qt, Protontricks, Wine, Winetricks |
+| **Media** | mpv (lightweight playback) |
+| **System** | htop, KDE Partition Manager, Plasma System Monitor, Gwenview, KCalc, Fastfetch, p7zip |
+| **Raptor Apps** | Raptor Cortex, Raptor Wallpaper, Raptor Update Manager — all grouped under their own **Raptor OS** category in the app menu |
+| **Overlays** | MangoHud (green palette, Shift+F12), Gamemode |
 
 ---
 
-## Operational Modes (Raptor Security Center)
+### Choose at First Boot
 
-| Profile | What it does |
+| Category | Apps |
 |---|---|
-| **Secure** | Default. Active nftables firewall, DNS-over-TLS, Tor-ready browser profile, base hardening (`sysctl`). |
-| **Hardened** | Full Tor network isolation, randomized MAC addresses per interface, restrictive egress firewall (only listed traffic + Tor/VPN), tighter sysctl. |
-| **Lockdown** | Cut it all: blocks all outbound except loopback/established (Tor/VPN tunnels still allowed), disables non-essential daemons, drops pending caches. |
-
-Switching modes is immediate and is applied through the **Raptor Mode Manager** daemon (D-Bus) — the dashboard only requests a mode; the daemon applies the `nft`/`sysctl`/`services` configs and reports back its **verified** state. Any field the daemon cannot verify renders neutral — never fake-good.
+| **Browser** | Firefox, Brave, Chromium, Chrome, Edge — all downloads (~100–150 MB), Firefox pre-selected |
+| **Chat** | Discord (~150 MB), Vesktop (~100 MB, Vencord built in) |
+| **Communication** | Telegram, Signal, Slack, Zoom, Thunderbird, Element (Matrix) |
+| **Productivity** | ONLYOFFICE, Bitwarden, Joplin, MarkText, Calibre, Obsidian, Zotero |
+| **Office** | LibreOffice |
+| **Creative** | GIMP, Inkscape, Krita, Darktable, Blender, Kdenlive, Shotcut, OBS Studio, Audacity, Boatswain, HandBrake |
+| **Development** | VSCodium, Developer Runtime (Git + Node.js + pip), Godot Engine, GitHub Desktop, Pods, GCC + Make + CMake, Ninja + Meson, Neovim, GitHub CLI, dash, xclip, ksshaskpass, libssh-tools |
+| **Gaming** | Bottles, Lutris, Protontricks, Spotify, Plex, VLC, Cartridges, Ryujinx, RPCS3, RetroArch, Dolphin Emulator, PCSX2, Chiaki, Goverlay |
+| **Privacy** | ProtonVPN, KeePassXC |
+| **Academic** | Zotero |
+| **Remote Access** | RustDesk, Remmina |
+| **Media & Downloads** | FreeTube, Parabolic, Kooha, Clapper, Amberol, qBittorrent, Subtitle Edit |
+| **Audio Production** | EasyEffects, Helvum, LMMS, Ardour |
+| **System** | Warehouse, Impression, CoreCtrl, btop, Variety, Mission Center, Flatseal, BleachBit, Filelight, GNOME Boxes, GNOME Backups, Warp, Flatsweep, Upscayl, Metadata Cleaner, Klipper, kfind, file-roller, Stacer, NCurses Du, Restic |
+| **Sync & VPN** | Syncthing, Tailscale |
 
 ---
 
-## Security Architecture
+## Raptor Cortex — Performance & Memory Manager
 
-- **D-Bus daemons** — Mode Manager, Tor Manager, VPN Manager, Network Protection Manager, Persistence Manager, Emergency Shutdown (all root-owned system services; the dashboard talks to them through system bus policies restricted to `raptor-admin` for privileged actions).
-- **ntables** — per-mode generated rule sets under `/etc/raptor-security/modes/`.
-- **`sdmem`** — RAM wipe on shutdown (three passes, so forensic recovery of the live session isn't feasible).
-- **MAC randomization** and hardened `sysctl` applied on boot.
-- **Public IP reporting always goes through the Tor SOCKS proxy** — the dashboard shows the exit-node IP, so connection identity is preserved even on the status page.
+GTK4/Adwaita app with three modes (Power Saving / Balanced / Performance), each applying correctly-differentiated `vm.swappiness` (180/30/5), CPU governor, Energy Performance Preference, CPU max frequency, ACPI platform profile, PCIe ASPM, NVMe power, and audio power settings — switching modes always does a full reset before applying the target mode's settings, so nothing can get stuck half-applied.
+
+- **Live stats** — RAM, swap, ZRAM, CPU boost, CPU/GPU temperature (colour-coded), CPU frequency, and time since the last optimization run
+- **Optimize Memory Now** — reclaims real application memory (Firefox/Vesktop heap), not just kernel page cache, via cgroup v2 `memory.reclaim`
+- **Quick Actions** — Pre-Game Boost (Performance mode + cache drop in one click), Restore Desktop, Clear Shader Cache
+- **Persistent Settings** — apply saved mode on every boot, auto-switch to Performance when a game launches, auto-restore Balanced when it exits
+- **Scheduled Cleanup** — optional background optimization on a configurable timer (5–120 min)
+- **Game Mode** — suspends 17 background services on game launch (Baloo, Akonadi, KDE Connect, speech-dispatcher, and more), stops `irqbalance`, disables CPU deep sleep for the duration; all resumed automatically on exit
+
+## Raptor GPU Profiler
+
+GPU profile selection now lives inside **Raptor Cortex**, under a **Graphics** group. It shipped as its own app for a while, which meant two windows and two launchers for one decision about the same machine; it is now the same row of controls as the CPU boost mode next to it.
+
+- Five profiles — **Auto Detect / Balanced / Max Performance / Extreme / Power Saving** — with a one-line plain-English description of what each actually changes
+- Applies immediately, no reboot; the choice survives a reboot because it is stored as a marker file that `gpu-detect.sh` re-reads on every boot
+- The `raptor-gpu-profile` package now ships only the detection and apply machinery. If it is not installed, Cortex says so instead of offering buttons that do nothing
+
+## Raptor Wallpaper
+
+Gallery-style wallpaper picker — click any thumbnail to apply it, including four bundled Raptor-branded wallpapers alongside anything in your Pictures folder. Fit mode control (Fill/Fit/Stretch/Center/Tile). Right-click any image file in Dolphin → **Set as Raptor Wallpaper** to apply it directly with no window opening.
+
+---
+
+## Performance
+
+### GPU
+- **Auto GPU detection** at boot — AMD, NVIDIA, Intel, hybrid; sets Vulkan ICD, env vars, shader cache, CPU governor per profile
+- **`RADV_PERFTEST=gpl`** — cuts in-game shader compile stalls 30–60% on RDNA2+
+- **Mesa GL threading** system-wide via `/etc/drirc.d/` — ~10–20% throughput on CPU-bound OpenGL games
+- **`WINE_FULLSCREEN_FSR` and `DXVK_ASYNC` not set globally** — both caused flickering in OpenGL games (Project Zomboid). Set per-game in Steam launch options instead
+
+### Wine & Windows Apps
+- **`raptor-wine` launcher** — `.exe`/`.msi` files are bound to a managed launcher (double-click in Dolphin or right-click → **Run as Windows App**). First launch bootstraps the prefix (`wineboot`) and silently installs the common MSVC++ runtimes + Windows fonts (`vcrun2015`, `vcrun2019`, `corefonts`) — best-effort and retried on flaky networks. `--prefix NAME` for isolated prefixes, `--reset` for a clean slate, `--install-runtime dotnet48` for .NET Framework on demand
+- **Session defaults** (`/etc/environment.d/10-raptor-wine.conf`) — `WINEESYNC`/`WINEFSYNC` kernel synchronization (fsync with esync fallback), quiet debug logging (`WINEDEBUG=-all`), `winemenubuilder` disabled so prefixes don't litter the app menu
+- **File-descriptor ceiling raised** to 1,048,576 — esync-heavy games and large prefixes no longer hit "eventfd: Too many open files" crashes
+- **Wine Mono + Gecko pre-installed** (`wine-mono`, `mingw32/mingw64-wine-gecko`) — .NET and JavaScript-based program loaders/installers work without Wine stalling to download runtimes on first launch
+- **ProtonUp-Qt pre-installed** for managing Proton and Wine-GE runners; Bottles, Lutris and more optionally available from the firstboot app picker
+
+### File Manager (Dolphin)
+- **Default file browser** — Dolphin, not Nautilus (removed). Folders and image types are bound via system-wide `/etc/xdg/mimeapps.list` (+ skel + login migration for existing users)
+- **ZIP/archive freeze & crash defused** — selecting or hovering a .zip used to make the F4 Information Panel parse the file with KFileMetaData in the main process (blocking the UI on big/remote archives and hard-crashing on corrupt ones). The panel is now static by default (`[InformationPanel]` `previewsShown`/`previewsAutoPlay`/`showHovered` all off — F4 still opens it on demand), and Baloo's content indexer is disabled with all archive globs (`*.zip *.tar *.gz *.7z …`) excluded, so bulk-selecting / right-clicking to delete archives never triggers an archive read. Ark's Compress/Extract context-menu plugins (which force a per-file MIME scan on any selection) are also removed at build time — double-clicking a .zip still opens it instantly in Ark. Configs seed new users via skel and correct existing users through a once-per-user login migration
+- **Preview plugins limited to images + folders** — video/audio/document thumbnail generation could stall selection on large media folders; restricting the enabled thumbnails keeps Dolphin responsive
+- **Archive MIME defaults bound to Ark** — double-clicking a .zip/.tar/.7z/.rar opens it in Ark immediately
+
+### CPU & Power
+- **Energy Performance Preference** — the single biggest battery saver on modern CPUs (Intel HWP, AMD P-state); cuts package power 20–40% in Power Saving mode vs governor alone
+- **CPU max frequency cap** (65% in Power Saving), **ACPI platform profile** coordination (fan curves, VRM limits at the firmware level on supported laptops)
+- **`kernel.sched_wakeup_granularity_ns=1000000`** — 1 ms vs kernel default 3 ms, reduces input/frame latency
+- **irqbalance** — suspended during game sessions to prevent IRQ reassignment causing frame-time spikes, restarted on exit
+
+### Memory — idle ~2.5–3 GB
+- **Akonadi, tracker-miner-fs, plasma-browser-integration masked** by default — none are needed on a gaming system, together save 300–650 MB
+- **Baloo: filename-only indexing** — full-text content indexing disabled, 1 thread max
+- **ZRAM** — zstd compression, `min(RAM/2, 8 GB)`, priority 100, `discard` enabled
+- **`vm.page-cluster=0`**, **`vm.watermark_boost_factor=0`**, **`vm.min_free_kbytes=131072`** — avoids unnecessary decompression, reclaim bursts, and allocation stalls
+- **Optimize Memory Now** in Cortex — real app-memory reclaim, not just cache drops
+
+### Audio
+- **PipeWire 512-sample quantum** (~10.7 ms) with matching low-latency config for **both** the native graph and the `pipewire-pulse` compatibility layer that Electron/Chromium apps (Discord, Spotify) actually route through — both configured with real-time scheduling
+- **`api.alsa.headroom=0`** for outputs — eliminates a 170 ms buffer mismatch that caused crackling
+- **Auto-suspend disabled** on all audio devices; PipeWire/WirePlumber/pipewire-pulse all auto-restart on crash with burst-limited retry
+
+### Network
+- **BBR congestion control + CAKE qdisc**, **128 MB TCP buffers**, **socket busy-polling**, **TCP fast-open**
+- **Network's own DNS wins, fast DoT resolvers on fallback** — the per-link (DHCP) resolver is always used first (so school/corporate DNS and captive portals work out of the box); Cloudflare/Quad9 DoT are consulted only when a network provides no DNS server. Pinning Cloudflare as the *only* resolver broke DPI'd networks that block `1.1.1.1`
+- **Forced WiFi reconnection on resume** — NetworkManager dispatcher + resume-trigger service cycle the WiFi interface on wake from suspend (school/corporate APs often drop associations during suspend), and the DNS cache is flushed to clear stale entries from the old network
+
+### Input
+- **USB autosuspend disabled** for HID devices and Bluetooth adapters specifically — excluded from Cortex's power-mode switching entirely, so a Bluetooth mouse/keyboard can never be swept into a suspended state by a mode change
+- **Stuck-cursor fix after lid close** — udev device re-enumeration and KWin config reload run on resume so the trackpad/pointing device reinitialises cleanly instead of leaving the cursor frozen
+- **Libinput tuning** (`61-raptor-libinput.conf`) — prevents stuck pointer state by reinitialising input devices on wake
+
+---
+
+## Window Management (Windows-style)
+- **Buttons** — Minimize, Maximize, Close on the right; App Menu on the left
+- **Titlebar double-click** — maximises the window
+- **Click to raise**, **edge snap** (drag to screen edge to tile)
+- Panel/taskbar uses KDE Plasma's own stock theme — green accent colours (buttons, selections, window decoration) still apply throughout, independent of the panel itself
 
 ---
 
 ## Built With
-
-- [Debian live-build](https://live-team.pages.debian.net/live-manual/) — `lb config / lb build` pipeline (`auto/`, hooks under `build/config/hooks/live/`, `includes.chroot` for the shipped `/etc`+`/usr` tree)
-- [GitHub Actions](.github/workflows/build-iso.yml) — validated per-push build → ISO artifact (hosted on Internet Archive for releases)
-- GTK4 + libadwaita dashboard, XFCE desktop, Tor, nftables
+- [BlueBuild](https://blue-build.org) — custom OCI image build system
+- [Bazzite](https://bazzite.gg) — base image (Fedora 42, KDE Plasma 6, Wayland)
 
 ## Changelog
-See [changelog.md](changelog.md) for the in-progress history.
+See [changelog.md](changelog.md) for full version history.
